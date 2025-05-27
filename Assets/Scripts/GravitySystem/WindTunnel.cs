@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GravityFlipLab.Physics
 {
-    public class WindTunnel : MonoBehaviour
+    public class WindTunnel : LocalGravityZone
     {
         [Header("Wind Settings")]
         public Vector2 windDirection = Vector2.right;
@@ -14,7 +14,7 @@ namespace GravityFlipLab.Physics
 
         [Header("Area")]
         public Vector2 tunnelSize = new Vector2(10f, 5f);
-        public bool useColliderBounds = true;
+        //public bool useColliderBounds = true;
 
         private List<Rigidbody2D> affectedObjects = new List<Rigidbody2D>();
         private float gustTimer = 0f;

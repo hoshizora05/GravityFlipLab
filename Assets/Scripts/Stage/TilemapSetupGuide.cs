@@ -449,7 +449,7 @@ namespace GravityFlipLab.Stage
             var playerMovement = player.GetComponent<PlayerMovement>();
             if (playerMovement != null)
             {
-                playerMovement.useTilemapGroundDetection = true;
+                //playerMovement.useTilemapGroundDetection = true;
                 playerMovement.groundLayerMask = groundManager.groundLayer;
                 Debug.Log("PlayerMovement configured for tilemap detection");
             }

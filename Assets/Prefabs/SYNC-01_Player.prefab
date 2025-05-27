@@ -4969,11 +4969,13 @@ GameObject:
   - component: {fileID: 4213869291999496872}
   - component: {fileID: 7188859290777138567}
   - component: {fileID: 3458361796981271630}
-  - component: {fileID: 2230049414761278484}
   - component: {fileID: 4990486651199994385}
   - component: {fileID: 3767698684334273367}
   - component: {fileID: 8919105931476469903}
   - component: {fileID: 872046611823939326}
+  - component: {fileID: 4882513865510784421}
+  - component: {fileID: 1008834187971518196}
+  - component: {fileID: 185831910818558098}
   m_Layer: 12
   m_Name: SYNC-01_Player
   m_TagString: Player
@@ -5168,31 +5170,6 @@ MonoBehaviour:
   fallTrigger: Fall
   gravityFlipTrigger: GravityFlip
   deathTrigger: Death
---- !u!114 &2230049414761278484
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3608284467634561112}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4c4ea61aaa6e278438b2a88244490deb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  movement: {fileID: 4990486651199994385}
-  playerAnimation: {fileID: 3458361796981271630}
-  playerCollision: {fileID: 3767698684334273367}
-  playerVisuals: {fileID: 8919105931476469903}
-  stats:
-    moveSpeed: 5
-    fallSpeed: 10
-    maxFallSpeed: 20
-    gravityScale: 1
-    invincibilityDuration: 0.1
-    isInvincible: 0
-    livesRemaining: 3
-  debugMode: 1
 --- !u!114 &4990486651199994385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5205,17 +5182,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4681be76bb120346b333e82d3cc4dcc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoRunSpeed: 5
-  gravityForce: 9.81
-  maxFallSpeed: 20
+  movementSettings:
+    baseRunSpeed: 5
+    speedVariation: 0.2
+    enableSpeedVariation: 1
+    customGravityStrength: 9.81
+    gravityTransitionSpeed: 8
+    useGravitySystemGravity: 1
+    slopeAcceleration: 1.3
+    slopeDeceleration: 0.8
+    maxSlopeAngle: 50
+    enableSlopeBoost: 1
+    airResistance: 0.98
+    terminalVelocity: 25
+    airControlFactor: 0.1
+    groundFriction: 0.99
+    bounceThreshold: 10
+    bounceDamping: 0.7
+    enableMomentumConservation: 1
+    enablePhysicsIntegration: 1
+    velocitySmoothing: 0.1
   groundLayerMask:
     serializedVersion: 2
     m_Bits: 256
   groundCheckDistance: 0.6
-  groundCheckPoint: {fileID: 3741423301699021353}
-  springForce: 5
-  slopeSpeedMultiplier: 1.2
-  useTilemapGroundDetection: 1
+  groundCheckRadius: 0.3
+  groundCheckPoints: []
+  showDebugInfo: 0
+  visualizeGroundChecks: 1
+  showVelocityVector: 1
 --- !u!114 &3767698684334273367
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5277,9 +5272,104 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b69de17f367f1847852740cdbaf6b9a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerController: {fileID: 2230049414761278484}
+  playerController: {fileID: 1008834187971518196}
   playerCollision: {fileID: 3767698684334273367}
   enableStageEvents: 1
+--- !u!114 &4882513865510784421
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3608284467634561112}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29722826fec9f234ea7bc9f8cb444c53, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gravityScale: 1
+  useCustomGravity: 1
+  smoothGravityTransition: 1
+  transitionSpeed: 5
+  maintainInertia: 1
+  inertiaDecay: 0.9
+  maxVelocityChange: 20
+--- !u!114 &1008834187971518196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3608284467634561112}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c4ea61aaa6e278438b2a88244490deb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerAnimation: {fileID: 3458361796981271630}
+  playerCollision: {fileID: 3767698684334273367}
+  playerVisuals: {fileID: 8919105931476469903}
+  stats:
+    moveSpeed: 5
+    fallSpeed: 10
+    maxFallSpeed: 20
+    gravityScale: 1
+    gravityFlipCooldown: 0.1
+    flipInvincibilityDuration: 0.1
+    preserveHorizontalMomentum: 1
+    verticalMomentumRetention: 0.3
+    invincibilityDuration: 0.1
+    isInvincible: 0
+    livesRemaining: 3
+    airDrag: 0.95
+    groundFriction: 0.98
+    maxVelocityMagnitude: 25
+  groundLayerMask:
+    serializedVersion: 2
+    m_Bits: 256
+  groundCheckDistance: 0.6
+  groundCheckPoint: {fileID: 0}
+  debugMode: 0
+  showTrajectoryPrediction: 0
+  trajectoryPoints: 20
+--- !u!114 &185831910818558098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3608284467634561112}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a725d4591e231b741a999c25a69d447d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  settings:
+    groundLayers:
+      serializedVersion: 2
+      m_Bits: 256
+    oneWayPlatformLayers:
+      serializedVersion: 2
+      m_Bits: 0
+    slopeLayerMask:
+      serializedVersion: 2
+      m_Bits: 0
+    groundCheckDistance: 0.6
+    sideCheckDistance: 0.3
+    groundRayCount: 5
+    raySpread: 0.6
+    enableEdgeDetection: 1
+    edgeDetectionDistance: 1
+    edgeThreshold: 0.3
+    maxWalkableAngle: 45
+    slopeDetectionSensitivity: 0.1
+    enableSlopeSnapping: 1
+    detectionFrequency: 1
+    useFixedUpdate: 1
+    enableCaching: 1
+  showDebugRays: 1
+  showGroundInfo: 1
+  logGroundChanges: 0
 --- !u!1 &4175828736110790596
 GameObject:
   m_ObjectHideFlags: 0
