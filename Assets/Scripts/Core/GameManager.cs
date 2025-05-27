@@ -292,18 +292,18 @@ namespace GravityFlipLab
 
         private void OnApplicationPause(bool pauseStatus)
         {
-            if (pauseStatus && currentState == GameState.Gameplay)
-            {
-                PauseGame();
-            }
+            //if (pauseStatus && currentState == GameState.Gameplay)
+            //{
+            //    PauseGame();
+            //}
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
-            if (!hasFocus && currentState == GameState.Gameplay)
-            {
-                PauseGame();
-            }
+            //if (!hasFocus && currentState == GameState.Gameplay)
+            //{
+            //    PauseGame();
+            //}
         }
     }
 

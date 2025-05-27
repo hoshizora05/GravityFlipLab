@@ -75,7 +75,7 @@ namespace GravityFlipLab.Stage
                 // Smooth follow with different damping for X and Y
                 Vector3 smoothPosition = new Vector3(
                     Mathf.SmoothDamp(transform.position.x, desiredPosition.x, ref velocity.x, horizontalDamping),
-                    Mathf.SmoothDamp(transform.position.y, desiredPosition.y, ref velocity.y, verticalDamping),
+                    0,//Mathf.SmoothDamp(transform.position.y, desiredPosition.y, ref velocity.y, verticalDamping),
                     transform.position.z
                 );
                 transform.position = smoothPosition;

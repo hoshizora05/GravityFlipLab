@@ -89,7 +89,7 @@ namespace GravityFlipLab.Stage
             }
         }
 
-        protected bool IsTargetValid(GameObject target)
+        public bool IsTargetValid(GameObject target)
         {
             return (targetLayers.value & (1 << target.layer)) != 0;
         }

@@ -8,63 +8,6 @@ namespace GravityFlipLab.Stage
 {
     #region Stage Data Structures
 
-    [System.Serializable]
-    public class StageInfo
-    {
-        public int worldNumber;
-        public int stageNumber;
-        public string stageName;
-        public float timeLimit = 300f; // 5 minutes default
-        public int energyChipCount = 3;
-        public Vector3 playerStartPosition;
-        public Vector3 goalPosition;
-        public List<Vector3> checkpointPositions = new List<Vector3>();
-        public StageTheme theme = StageTheme.Tech;
-
-        [Header("Stage Layout")]
-        public float stageLength = 4096f; // Stage width in pixels
-        public float stageHeight = 1024f; // Stage height in pixels
-        public int segmentCount = 16; // Number of 256px segments
-    }
-
-
-    public enum StageTheme
-    {
-        Tech,
-        Industrial,
-        Organic,
-        Crystal,
-        Void
-    }
-
-    
-    public enum ObstacleType
-    {
-        Spike,
-        ElectricFence,
-        PistonCrusher,
-        RotatingSaw,
-        HoverDrone,
-        TimerGate,
-        PhaseBlock,
-        PressureSwitch
-    }
-
-    public enum CollectibleType
-    {
-        EnergyChip,
-        PowerUp,
-        ExtraLife
-    }
-
-    public enum EnvironmentalType
-    {
-        GravityWell,
-        WindTunnel,
-        SpringPlatform,
-        MovingPlatform
-    }
-
     #endregion
 
     #region Stage Manager
@@ -245,6 +188,8 @@ namespace GravityFlipLab.Stage
             // Load environmental objects
             yield return StartCoroutine(LoadEnvironmental());
 
+            //yield return StartCoroutine(SetupTerrain());
+
             // Initialize stage
             InitializeStage();
 
@@ -266,7 +211,7 @@ namespace GravityFlipLab.Stage
                 {
                     parallaxLayer.spriteRenderer.sprite = layerData.backgroundSprite;
                     parallaxLayer.parallaxFactor = layerData.parallaxFactor;
-                    parallaxLayer.textureSize = layerData.tileSize;
+                    parallaxLayer.textureScale = layerData.tileSize;
                     parallaxLayer.spriteRenderer.color = layerData.tintColor;
                     parallaxLayer.enableVerticalParallax = layerData.enableVerticalLoop;
 
@@ -517,6 +462,152 @@ namespace GravityFlipLab.Stage
                     }
                     break;
             }
+        }
+
+        [Header("Tilemap System")]
+        public TilemapGroundManager tilemapGroundManager;
+        public bool useTilemapTerrain = true;
+        public LayerMask groundLayerMask = 1;
+
+        // Tilemap地形の初期化を追加
+        private IEnumerator SetupTerrain()
+        {
+            if (!useTilemapTerrain || currentStageData == null) yield break;
+
+            // TilemapGroundManagerの初期化
+            if (tilemapGroundManager == null)
+            {
+                GameObject tilemapManagerObj = new GameObject("TilemapGroundManager");
+                tilemapManagerObj.transform.SetParent(transform);
+                tilemapGroundManager = tilemapManagerObj.AddComponent<TilemapGroundManager>();
+            }
+
+            // StageManagerとの統合
+            tilemapGroundManager.IntegrateWithStageManager(this);
+
+            // 地形データの検証
+            if (TerrainDataValidator.ValidateStageData(currentStageData))
+            {
+                // 地形データからTilemapを生成
+                yield return StartCoroutine(GenerateTerrainFromData());
+            }
+            else
+            {
+                Debug.LogWarning("Invalid terrain data, generating basic ground");
+                tilemapGroundManager.GenerateBasicGround();
+            }
+
+            yield return new WaitForEndOfFrame();
+        }
+
+        private IEnumerator GenerateTerrainFromData()
+        {
+            if (currentStageData.terrainLayers == null) yield break;
+
+            // 地形レイヤーごとに生成
+            foreach (var terrainLayer in currentStageData.terrainLayers)
+            {
+                if (terrainLayer.autoGenerate)
+                {
+                    yield return StartCoroutine(GenerateTerrainLayer(terrainLayer));
+                }
+            }
+
+            // セグメントデータからの詳細地形生成
+            if (currentStageData.terrainSegments != null)
+            {
+                yield return StartCoroutine(GenerateTerrainSegments());
+            }
+
+            // 地形生成完了後の最適化
+            tilemapGroundManager.OptimizeForPerformance();
+        }
+
+        private IEnumerator GenerateTerrainLayer(TerrainLayerData layerData)
+        {
+            if (layerData.tileVariants == null || layerData.tileVariants.Length == 0) yield break;
+
+            Tilemap targetTilemap = tilemapGroundManager.foregroundTilemap;
+
+            switch (layerData.generationMode)
+            {
+                case TerrainGenerationMode.Flat:
+                    StartCoroutine(GenerateFlatLayer(targetTilemap, layerData));
+                    break;
+                case TerrainGenerationMode.FromHeightmap:
+                    if (currentStageData.heightMap != null)
+                    {
+                        TerrainGenerator.GenerateFromHeightmap(
+                            targetTilemap,
+                            currentStageData.heightMap,
+                            layerData,
+                            currentStageData.tileMapSize
+                        );
+                    }
+                    break;
+                case TerrainGenerationMode.Custom:
+                    if (currentStageData.enableProceduralGeneration)
+                    {
+                        TerrainGenerator.GenerateProceduralTerrain(
+                            targetTilemap,
+                            layerData,
+                            currentStageData.tileMapSize,
+                            currentStageData.proceduralSeed
+                        );
+                    }
+                    break;
+            }
+
+            yield return new WaitForEndOfFrame();
+        }
+
+        private IEnumerator GenerateFlatLayer(Tilemap tilemap, TerrainLayerData layerData)
+        {
+            int groundLevel = Mathf.RoundToInt(layerData.baseHeight);
+            int thickness = Mathf.RoundToInt(layerData.thickness);
+            int width = currentStageData.tileMapSize.x;
+
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < thickness; y++)
+                {
+                    Vector3Int position = new Vector3Int(x, groundLevel - y, 0);
+                    TileBase tile = GetRandomTile(layerData.tileVariants, x, y);
+                    tilemap.SetTile(position, tile);
+                }
+
+                // 進行状況をフレーム間で分散
+                if (x % 50 == 0)
+                {
+                    yield return null;
+                }
+            }
+        }
+
+        private IEnumerator GenerateTerrainSegments()
+        {
+            foreach (var segment in currentStageData.terrainSegments)
+            {
+                if (segment != null)
+                {
+                    var primaryLayer = currentStageData.terrainLayers[0]; // プライマリレイヤーを使用
+                    TerrainGenerator.GenerateTerrainSegment(
+                        tilemapGroundManager.foregroundTilemap,
+                        segment,
+                        primaryLayer
+                    );
+                }
+                yield return null; // フレーム分散
+            }
+        }
+
+        private TileBase GetRandomTile(TileBase[] tiles, int x, int y)
+        {
+            if (tiles.Length == 1) return tiles[0];
+
+            int seed = x * 1000 + y;
+            System.Random random = new System.Random(seed);
+            return tiles[random.Next(tiles.Length)];
         }
     }
     #endregion

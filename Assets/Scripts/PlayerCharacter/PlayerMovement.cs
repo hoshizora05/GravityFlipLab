@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GravityFlipLab.Player
 {
-    public class PlayerMovement : MonoBehaviour
+    public partial class PlayerMovement : MonoBehaviour
     {
         [Header("Movement Settings")]
         public float autoRunSpeed = 5.0f;
@@ -41,6 +41,8 @@ namespace GravityFlipLab.Player
 
         private void FixedUpdate()
         {
+            if (playerController == null) return;
+
             if (!playerController.isAlive) return;
 
             // Ground detection
