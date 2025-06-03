@@ -20,7 +20,6 @@ namespace GravityFlipLab.UI
 
         [Header("Visual Elements")]
         [SerializeField] private GameObject menuPanel;
-        [SerializeField] private CanvasGroup fadeCanvasGroup;
         [SerializeField] private TMPro.TextMeshProUGUI playerProgressText;
         [SerializeField] private TMPro.TextMeshProUGUI totalEnergyChipsText;
 
@@ -31,7 +30,6 @@ namespace GravityFlipLab.UI
         [SerializeField] private AudioClip menuBGM;
 
         [Header("Animation Settings")]
-        [SerializeField] private float fadeTransitionDuration = 1f;
         [SerializeField] private float buttonAnimationDelay = 0.1f;
         [SerializeField] private float menuAnimationDuration = 0.8f;
 
@@ -77,25 +75,6 @@ namespace GravityFlipLab.UI
             // Setup audio source
             audioSource.loop = true;
             audioSource.volume = 0.8f;
-
-            // Initialize fade canvas group
-            if (fadeCanvasGroup == null)
-            {
-                GameObject fadeObject = new GameObject("FadeCanvasGroup");
-                fadeObject.transform.SetParent(transform);
-                fadeCanvasGroup = fadeObject.AddComponent<CanvasGroup>();
-
-                // Setup fade panel
-                Image fadeImage = fadeObject.AddComponent<Image>();
-                fadeImage.color = Color.black;
-                fadeImage.raycastTarget = false;
-
-                RectTransform fadeRect = fadeObject.GetComponent<RectTransform>();
-                fadeRect.anchorMin = Vector2.zero;
-                fadeRect.anchorMax = Vector2.one;
-                fadeRect.offsetMin = Vector2.zero;
-                fadeRect.offsetMax = Vector2.zero;
-            }
         }
 
         private void SetupMenuButtons()
@@ -201,9 +180,6 @@ namespace GravityFlipLab.UI
         {
             GameManager.Instance.ChangeGameState(GameState.MainMenu);
 
-            // Start with black screen
-            fadeCanvasGroup.alpha = 1f;
-
             // Hide menu initially
             if (menuPanel != null)
                 menuPanel.SetActive(false);
@@ -215,11 +191,8 @@ namespace GravityFlipLab.UI
                 audioSource.Play();
             }
 
-            // Wait a moment
-            yield return new WaitForSeconds(0.2f);
-
-            // Fade in from black
-            yield return StartCoroutine(FadeIn());
+            // Wait a moment for fade system to handle the transition
+            yield return new WaitForSeconds(0.5f);
 
             // Show and animate menu
             if (menuPanel != null)
@@ -236,36 +209,6 @@ namespace GravityFlipLab.UI
 
             // Fire event
             OnMainMenuLoaded?.Invoke();
-        }
-
-        private IEnumerator FadeIn()
-        {
-            float elapsedTime = 0f;
-
-            while (elapsedTime < fadeTransitionDuration)
-            {
-                elapsedTime += Time.deltaTime;
-                float alpha = Mathf.Lerp(1f, 0f, elapsedTime / fadeTransitionDuration);
-                fadeCanvasGroup.alpha = alpha;
-                yield return null;
-            }
-
-            fadeCanvasGroup.alpha = 0f;
-        }
-
-        private IEnumerator FadeOut()
-        {
-            float elapsedTime = 0f;
-
-            while (elapsedTime < fadeTransitionDuration)
-            {
-                elapsedTime += Time.deltaTime;
-                float alpha = Mathf.Lerp(0f, 1f, elapsedTime / fadeTransitionDuration);
-                fadeCanvasGroup.alpha = alpha;
-                yield return null;
-            }
-
-            fadeCanvasGroup.alpha = 1f;
         }
 
         private IEnumerator AnimateMenuEntrance()
@@ -450,7 +393,7 @@ namespace GravityFlipLab.UI
             if (isTransitioning) return;
 
             OnButtonClick();
-            StartCoroutine(TransitionToStageSelect());
+            TransitionToStageSelect();
         }
 
         private void OnOptionsButtonClicked()
@@ -458,7 +401,7 @@ namespace GravityFlipLab.UI
             if (isTransitioning) return;
 
             OnButtonClick();
-            StartCoroutine(TransitionToOptions());
+            TransitionToOptions();
         }
 
         private void OnLeaderboardButtonClicked()
@@ -466,7 +409,7 @@ namespace GravityFlipLab.UI
             if (isTransitioning) return;
 
             OnButtonClick();
-            StartCoroutine(TransitionToLeaderboard());
+            TransitionToLeaderboard();
         }
 
         private void OnShopButtonClicked()
@@ -474,7 +417,7 @@ namespace GravityFlipLab.UI
             if (isTransitioning) return;
 
             OnButtonClick();
-            StartCoroutine(TransitionToShop());
+            TransitionToShop();
         }
 
         private void OnBackToTitleButtonClicked()
@@ -482,7 +425,7 @@ namespace GravityFlipLab.UI
             if (isTransitioning) return;
 
             OnButtonClick();
-            StartCoroutine(TransitionToTitle());
+            TransitionToTitle();
         }
 
         private void OnExitButtonClicked()
@@ -490,12 +433,12 @@ namespace GravityFlipLab.UI
             if (isTransitioning) return;
 
             OnButtonClick();
-            StartCoroutine(ExitGame());
+            ExitGame();
         }
 
         #endregion
 
-        #region Scene Transitions
+        #region Scene Transitions (Simplified)
 
         private IEnumerator StartNewGame()
         {
@@ -506,15 +449,10 @@ namespace GravityFlipLab.UI
             GameManager.Instance.playerProgress = SaveManager.Instance.CreateNewProgress();
             GameManager.Instance.SetCurrentStage(1, 1);
 
-            // Fade out audio
-            yield return StartCoroutine(FadeOutAudio());
+            // Use FadeTransitionManager for transition
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.Gameplay);
 
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load game scene
-            GameManager.Instance.ChangeGameState(GameState.Loading);
-            SceneTransitionManager.Instance.LoadScene(SceneType.Gameplay);
+            yield break;
         }
 
         private IEnumerator ContinueGame()
@@ -528,102 +466,60 @@ namespace GravityFlipLab.UI
             int stage = GameManager.Instance.playerProgress.currentStage;
             GameManager.Instance.SetCurrentStage(world, stage);
 
-            // Fade out audio
-            yield return StartCoroutine(FadeOutAudio());
+            // Use FadeTransitionManager for transition
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.Gameplay);
 
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load game scene
-            GameManager.Instance.ChangeGameState(GameState.Loading);
-            SceneTransitionManager.Instance.LoadScene(SceneType.Gameplay);
+            yield break;
         }
 
-        private IEnumerator TransitionToStageSelect()
+        private void TransitionToStageSelect()
         {
             isTransitioning = true;
             inputEnabled = false;
-
-            // Fade out audio
-            yield return StartCoroutine(FadeOutAudio());
-
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load stage select scene
-            SceneTransitionManager.Instance.LoadScene(SceneType.StageSelect);
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.StageSelect);
         }
 
-        private IEnumerator TransitionToOptions()
+        private void TransitionToOptions()
         {
             isTransitioning = true;
             inputEnabled = false;
-
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load options scene
-            SceneTransitionManager.Instance.LoadScene(SceneType.Options);
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.Options);
         }
 
-        private IEnumerator TransitionToLeaderboard()
+        private void TransitionToLeaderboard()
         {
             isTransitioning = true;
             inputEnabled = false;
-
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load leaderboard scene
-            SceneTransitionManager.Instance.LoadScene(SceneType.Leaderboard);
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.Leaderboard);
         }
 
-        private IEnumerator TransitionToShop()
+        private void TransitionToShop()
         {
             isTransitioning = true;
             inputEnabled = false;
-
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load shop scene
-            SceneTransitionManager.Instance.LoadScene(SceneType.Shop);
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.Shop);
         }
 
-        private IEnumerator TransitionToTitle()
+        private void TransitionToTitle()
         {
             isTransitioning = true;
             inputEnabled = false;
-
             OnMainMenuExit?.Invoke();
-
-            // Fade out audio
-            yield return StartCoroutine(FadeOutAudio());
-
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Load title scene
-            SceneTransitionManager.Instance.LoadScene(SceneType.Title);
+            FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.Title);
         }
 
-        private IEnumerator ExitGame()
+        private void ExitGame()
         {
             isTransitioning = true;
             inputEnabled = false;
 
-            // Fade out audio
-            yield return StartCoroutine(FadeOutAudio());
-
-            // Fade to black
-            yield return StartCoroutine(FadeOut());
-
-            // Exit application
+            FadeTransitionManager.Instance.FadeOut(1f, () => {
 #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
+                UnityEditor.EditorApplication.isPlaying = false;
 #else
-            Application.Quit();
+                Application.Quit();
 #endif
+            });
         }
 
         #endregion
@@ -644,25 +540,6 @@ namespace GravityFlipLab.UI
             {
                 audioSource.PlayOneShot(buttonClickSound, 0.7f);
             }
-        }
-
-        private IEnumerator FadeOutAudio()
-        {
-            if (audioSource == null || !audioSource.isPlaying) yield break;
-
-            float startVolume = audioSource.volume;
-            float elapsedTime = 0f;
-            float duration = 1f;
-
-            while (elapsedTime < duration)
-            {
-                elapsedTime += Time.deltaTime;
-                audioSource.volume = Mathf.Lerp(startVolume, 0f, elapsedTime / duration);
-                yield return null;
-            }
-
-            audioSource.Stop();
-            audioSource.volume = startVolume;
         }
 
         #endregion

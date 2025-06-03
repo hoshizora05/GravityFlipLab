@@ -205,26 +205,50 @@ namespace GravityFlipLab.Stage
 
         private void CompleteStage()
         {
-            // PlayerStageAdapterを通じてゴール処理を実行
-            var playerStageAdapter = FindFirstObjectByType<PlayerStageAdapter>();
+            Debug.Log($"Goal reached at {transform.position}");
+
+            // フェードアウト後にメインメニューへ遷移
+            StartCoroutine(CompleteStageSequence());
+        }
+
+        private IEnumerator CompleteStageSequence()
+        {
+            // プレイヤーの動きを停止
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                var rb = player.GetComponent<Rigidbody2D>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector2.zero;
+                    rb.bodyType = RigidbodyType2D.Kinematic;
+                }
+            }
+
+            // ステージクリア処理を実行
+            var playerStageAdapter = FindObjectOfType<PlayerStageAdapter>();
             if (playerStageAdapter != null)
             {
                 playerStageAdapter.ReachGoal();
             }
-            else
+            else if (Stage.StageManager.Instance != null)
             {
-                // 直接StageManagerを呼び出し
-                if (StageManager.Instance != null)
-                {
-                    StageManager.Instance.CompleteStage();
-                }
-                else
-                {
-                    Debug.LogWarning("No StageManager or PlayerStageAdapter found for goal completion");
-                }
+                Stage.StageManager.Instance.CompleteStage();
             }
 
-            Debug.Log($"Goal reached at {transform.position} after {Time.time - activationTime:F2} seconds");
+            // 少し待ってからフェードアウト開始
+            yield return new WaitForSeconds(1.5f);
+
+            // フェードアウトしてメインメニューへ遷移
+            if (FadeTransitionManager.Instance != null)
+            {
+                FadeTransitionManager.Instance.FadeOutAndLoadScene(SceneType.MainMenu, 1f);
+            }
+            else
+            {
+                // フェードマネージャーがない場合は直接遷移
+                SceneTransitionManager.Instance.LoadScene(SceneType.MainMenu);
+            }
         }
 
         // デバッグ用の強制ゴール処理
