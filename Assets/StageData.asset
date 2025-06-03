@@ -20,7 +20,10 @@ MonoBehaviour:
     energyChipCount: 3
     playerStartPosition: {x: 0, y: 0, z: 0}
     goalPosition: {x: 40, y: 0, z: 0}
-    checkpointPositions: []
+    checkpointPositions:
+    - {x: 10, y: 0, z: 0}
+    - {x: 20, y: 0, z: 0}
+    - {x: 30, y: 0, z: 0}
     theme: 0
     stageLength: 4096
     stageHeight: 1024
@@ -46,13 +49,13 @@ MonoBehaviour:
     tintColor: {r: 1, g: 1, b: 1, a: 1}
   obstacles:
   - type: 0
-    position: {x: 10, y: -2, z: 0}
+    position: {x: 20, y: -6.74, z: 0}
     rotation: {x: 0, y: 0, z: 0}
-    scale: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
   - type: 1
     position: {x: 20, y: 0, z: 0}
     rotation: {x: 0, y: 0, z: 0}
-    scale: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
   collectibles:
   - type: 0
     position: {x: 15, y: 2, z: 0}

@@ -1437,6 +1437,7 @@ GameObject:
   m_Component:
   - component: {fileID: 731002913}
   - component: {fileID: 731002912}
+  - component: {fileID: 731002914}
   m_Layer: 0
   m_Name: StageManager
   m_TagString: Untagged
@@ -1466,6 +1467,9 @@ MonoBehaviour:
   foregroundCollider: {fileID: 0}
   goalPrefab: {fileID: 1412176488493205532, guid: 25bc9e42b5e8d3c4d95b660b15d8320a, type: 3}
   playerPrefab: {fileID: 3608284467634561112, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
+  useEnhancedCheckpointSystem: 1
+  checkpointPrefab: {fileID: 8047611292910757226, guid: 54725deb7cbf7eb478e3508a6b28d317, type: 3}
+  checkpointSpacing: 512
   obstaclePrefabs:
   - {fileID: 2427247530994779155, guid: c07623563c241c44f83c743b1822b6ef, type: 3}
   - {fileID: 1425810193327305883, guid: 6bcc9a5a929a42a4294c3fd046909fe7, type: 3}
@@ -1508,6 +1512,32 @@ Transform:
   - {fileID: 577731536}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &731002914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 731002911}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57dc13fdf6c3a9c48b6745aed7110ed3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultCheckpointPosition: {x: 0, y: 0, z: 0}
+  respawnDelay: 1
+  preserveVelocityOnRespawn: 0
+  resetGravityOnRespawn: 1
+  checkpointEffect: {fileID: 0}
+  respawnEffect: {fileID: 0}
+  checkpointSound: {fileID: 0}
+  respawnSound: {fileID: 0}
+  enableSafetyRespawn: 1
+  safetyCheckDistance: 50
+  maxRespawnAttempts: 3
+  debugMode: 0
+  showCheckpointGizmos: 1
+  logRespawnEvents: 1
 --- !u!1 &795846102
 GameObject:
   m_ObjectHideFlags: 0
