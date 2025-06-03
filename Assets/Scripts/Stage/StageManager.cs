@@ -54,6 +54,11 @@ namespace GravityFlipLab.Stage
         public GameObject playerPrefab; // プレイヤープレハブの参照
         private GameObject currentPlayer; // 現在のプレイヤーオブジェクト
 
+        [Header("Checkpoint Integration")]
+        public bool useEnhancedCheckpointSystem = true;
+        public GameObject checkpointPrefab;
+        public float checkpointSpacing = 512f; // Distance between auto-generated checkpoints
+
         [Header("Prefab References")]
         public GameObject[] obstaclePrefabs = new GameObject[8]; // One for each ObstacleType
         public GameObject[] collectiblePrefabs = new GameObject[3]; // One for each CollectibleType
@@ -201,10 +206,10 @@ namespace GravityFlipLab.Stage
             // Load environmental objects
             yield return StartCoroutine(LoadEnvironmental());
 
-            // Setup goal - 新規追加
+            // Setup goal
             SetupGoal();
 
-            // Setup player - 新規追加
+            // Setup player
             SetupPlayer();
 
             //yield return StartCoroutine(SetupTerrain());
@@ -216,7 +221,7 @@ namespace GravityFlipLab.Stage
             OnStageLoaded?.Invoke();
         }
 
-        // 新規追加: ゴールセットアップメソッド
+        // ゴールセットアップメソッド
         private void SetupGoal()
         {
             if (currentStageData?.stageInfo == null) return;
@@ -246,7 +251,7 @@ namespace GravityFlipLab.Stage
             }
         }
 
-        // 新規追加: デフォルトゴール作成メソッド
+        // デフォルトゴール作成メソッド
         private void CreateDefaultGoal(Vector3 position)
         {
             currentGoal = new GameObject("StageGoal");
@@ -279,7 +284,7 @@ namespace GravityFlipLab.Stage
             Debug.Log($"Default goal created at position: {position}");
         }
 
-        // 新規追加: プレイヤーセットアップメソッド
+        // プレイヤーセットアップメソッド
         private void SetupPlayer()
         {
             if (currentStageData?.stageInfo == null) return;
@@ -319,7 +324,7 @@ namespace GravityFlipLab.Stage
             }
         }
 
-        // 新規追加: デフォルトプレイヤー作成メソッド
+        // デフォルトプレイヤー作成メソッド
         private void CreateDefaultPlayer(Vector3 position)
         {
             currentPlayer = new GameObject("Player");
@@ -346,7 +351,7 @@ namespace GravityFlipLab.Stage
             Debug.Log($"Default player created at position: {position}");
         }
 
-        // 新規追加: デフォルトプレイヤースプライト作成
+        // デフォルトプレイヤースプライト作成
         private Sprite CreateDefaultPlayerSprite()
         {
             // 16x32の青い四角形テクスチャを作成（プレイヤー形状）
@@ -363,6 +368,7 @@ namespace GravityFlipLab.Stage
 
             return Sprite.Create(texture, new Rect(0, 0, 16, 32), new Vector2(0.5f, 0.5f), 16f);
         }
+
         private Sprite CreateDefaultGoalSprite()
         {
             // 32x32の黄色い四角形テクスチャを作成
@@ -492,7 +498,26 @@ namespace GravityFlipLab.Stage
         {
             stageStartTime = Time.time;
 
-            // Set up checkpoints
+            // Initialize player position and setup enhanced checkpoint system
+            if (currentPlayer != null)
+            {
+                Vector3 playerStartPos = currentStageData.stageInfo.playerStartPosition;
+                currentPlayer.transform.position = playerStartPos;
+
+                // Set initial checkpoint with enhanced system
+                if (useEnhancedCheckpointSystem && CheckpointManager.Instance != null)
+                {
+                    CheckpointManager.Instance.SetCheckpoint(playerStartPos, GravityDirection.Down, true);
+                }
+
+                // Set camera target
+                if (cameraController != null)
+                {
+                    cameraController.SetTarget(currentPlayer.transform);
+                }
+            }
+
+            // Set up checkpoints after player is positioned
             SetupCheckpoints();
 
             // Initialize all obstacles
@@ -501,32 +526,215 @@ namespace GravityFlipLab.Stage
                 obstacle.StartObstacle();
             }
 
-            // Set camera target to player if both exist
-            if (cameraController != null && currentPlayer != null)
+            Debug.Log($"Stage initialized with {(useEnhancedCheckpointSystem ? "enhanced" : "basic")} checkpoint system");
+        }
+
+        // Enhanced checkpoint setup method
+        private void SetupCheckpoints()
+        {
+            if (useEnhancedCheckpointSystem)
             {
-                cameraController.SetTarget(currentPlayer.transform);
+                SetupEnhancedCheckpoints();
+            }
+            else
+            {
+                SetupBasicCheckpoints();
             }
         }
 
-        private void SetupCheckpoints()
+        private void SetupEnhancedCheckpoints()
         {
+            // Reset checkpoint manager
+            if (CheckpointManager.Instance != null)
+            {
+                CheckpointManager.Instance.ResetToDefaultCheckpoint();
+            }
+
+            // Create checkpoints from stage data
+            if (currentStageData?.stageInfo?.checkpointPositions != null && currentStageData.stageInfo.checkpointPositions.Count > 0)
+            {
+                foreach (var checkpointPos in currentStageData.stageInfo.checkpointPositions)
+                {
+                    CreateEnhancedCheckpoint(checkpointPos);
+                }
+
+                Debug.Log($"Setup {currentStageData.stageInfo.checkpointPositions.Count} enhanced checkpoints from stage data");
+            }
+            else
+            {
+                // Auto-generate checkpoints if none defined
+                GenerateAutoCheckpoints();
+            }
+        }
+
+        private void SetupBasicCheckpoints()
+        {
+            // Enhanced version of existing basic checkpoint setup
             CheckpointManager.Instance.ResetToDefaultCheckpoint();
 
-            foreach (var checkpointPos in currentStageData.stageInfo.checkpointPositions)
+            if (currentStageData?.stageInfo?.checkpointPositions != null)
             {
-                // Create checkpoint trigger objects if needed
-                GameObject checkpoint = new GameObject("Checkpoint");
-                checkpoint.transform.position = checkpointPos;
-                checkpoint.layer = LayerMask.NameToLayer("Checkpoint");
-
-                BoxCollider2D trigger = checkpoint.AddComponent<BoxCollider2D>();
-                trigger.isTrigger = true;
-                trigger.size = Vector2.one;
-
-                // Add checkpoint trigger component
-                CheckpointTrigger triggerScript = checkpoint.AddComponent<CheckpointTrigger>();
-                triggerScript.checkpointPosition = checkpointPos;
+                foreach (var checkpointPos in currentStageData.stageInfo.checkpointPositions)
+                {
+                    CreateBasicCheckpoint(checkpointPos);
+                }
             }
+        }
+
+        private void CreateEnhancedCheckpoint(Vector3 position)
+        {
+            GameObject checkpoint;
+
+            if (checkpointPrefab != null)
+            {
+                checkpoint = Instantiate(checkpointPrefab, position, Quaternion.identity);
+            }
+            else
+            {
+                checkpoint = new GameObject("Enhanced Checkpoint");
+                checkpoint.transform.position = position;
+
+                // Add visual components
+                CreateCheckpointVisuals(checkpoint);
+            }
+
+            // Ensure CheckpointTrigger component
+            var checkpointTrigger = checkpoint.GetComponent<CheckpointTrigger>();
+            if (checkpointTrigger == null)
+            {
+                checkpointTrigger = checkpoint.AddComponent<CheckpointTrigger>();
+            }
+
+            // Configure trigger
+            checkpointTrigger.checkpointPosition = position;
+            checkpointTrigger.useTransformPosition = true;
+            checkpointTrigger.saveGravityState = true;
+            checkpointTrigger.requireGrounded = false; // Allow air checkpoints
+
+            // Add collider if needed
+            if (checkpoint.GetComponent<Collider2D>() == null)
+            {
+                var collider = checkpoint.AddComponent<BoxCollider2D>();
+                collider.isTrigger = true;
+                collider.size = Vector2.one * 2f; // Larger trigger area
+            }
+
+            // Set layer
+            checkpoint.layer = LayerMask.NameToLayer("Checkpoint");
+
+            // Parent to environmental container
+            if (environmentalParent != null)
+            {
+                checkpoint.transform.SetParent(environmentalParent);
+            }
+        }
+
+        private void CreateBasicCheckpoint(Vector3 position)
+        {
+            GameObject checkpoint = new GameObject("Checkpoint");
+            checkpoint.transform.position = position;
+            checkpoint.layer = LayerMask.NameToLayer("Checkpoint");
+
+            BoxCollider2D trigger = checkpoint.AddComponent<BoxCollider2D>();
+            trigger.isTrigger = true;
+            trigger.size = Vector2.one;
+
+            CheckpointTrigger triggerScript = checkpoint.AddComponent<CheckpointTrigger>();
+            triggerScript.checkpointPosition = position;
+
+            // Parent to environmental container
+            if (environmentalParent != null)
+            {
+                checkpoint.transform.SetParent(environmentalParent);
+            }
+        }
+
+        private void CreateCheckpointVisuals(GameObject checkpoint)
+        {
+            // Create basic visual components for checkpoint
+            var spriteRenderer = checkpoint.AddComponent<SpriteRenderer>();
+
+            // Create a simple checkpoint sprite
+            Texture2D checkpointTexture = CreateCheckpointTexture();
+            Sprite checkpointSprite = Sprite.Create(checkpointTexture,
+                new Rect(0, 0, checkpointTexture.width, checkpointTexture.height),
+                new Vector2(0.5f, 0.5f));
+
+            spriteRenderer.sprite = checkpointSprite;
+            spriteRenderer.color = Color.yellow;
+            spriteRenderer.sortingOrder = 10;
+
+            // Add simple animation component
+            var animator = checkpoint.AddComponent<Animator>();
+            // You can create an AnimatorController for checkpoint animations
+        }
+
+        private Texture2D CreateCheckpointTexture()
+        {
+            // Create a simple checkpoint texture
+            Texture2D texture = new Texture2D(32, 32);
+            Color[] colors = new Color[32 * 32];
+
+            for (int i = 0; i < colors.Length; i++)
+            {
+                int x = i % 32;
+                int y = i / 32;
+
+                // Create a simple flag-like pattern
+                if ((x > 10 && x < 30) && (y > 10 && y < 30))
+                {
+                    colors[i] = Color.yellow;
+                }
+                else if (x == 10)
+                {
+                    colors[i] = Color.black; // Flagpole
+                }
+                else
+                {
+                    colors[i] = Color.clear;
+                }
+            }
+
+            texture.SetPixels(colors);
+            texture.Apply();
+            return texture;
+        }
+
+        private void GenerateAutoCheckpoints()
+        {
+            if (currentStageData?.stageInfo == null) return;
+
+            float stageLength = currentStageData.stageInfo.stageLength;
+            Vector3 startPos = currentStageData.stageInfo.playerStartPosition;
+
+            // Generate checkpoints at regular intervals
+            int checkpointCount = Mathf.FloorToInt(stageLength / checkpointSpacing);
+
+            for (int i = 1; i <= checkpointCount; i++)
+            {
+                Vector3 checkpointPos = startPos + Vector3.right * (checkpointSpacing * i);
+
+                // Adjust Y position to ground level
+                checkpointPos.y = FindGroundLevel(checkpointPos.x);
+
+                CreateEnhancedCheckpoint(checkpointPos);
+            }
+
+            Debug.Log($"Auto-generated {checkpointCount} checkpoints");
+        }
+
+        private float FindGroundLevel(float xPosition)
+        {
+            // Raycast down to find ground level
+            Vector2 rayStart = new Vector2(xPosition, 50f); // Start high
+            RaycastHit2D hit = Physics2D.Raycast(rayStart, Vector2.down, 100f, groundLayerMask);
+
+            if (hit.collider != null)
+            {
+                return hit.point.y + 1f; // Slightly above ground
+            }
+
+            return 0f; // Default ground level
         }
 
         public void ClearStage()
@@ -555,14 +763,14 @@ namespace GravityFlipLab.Stage
             }
             environmentalObjects.Clear();
 
-            // Clear goal - 新規追加
+            // Clear goal
             if (currentGoal != null)
             {
                 DestroyImmediate(currentGoal);
                 currentGoal = null;
             }
 
-            // Clear player - 新規追加
+            // Clear player
             if (currentPlayer != null)
             {
                 DestroyImmediate(currentPlayer);
@@ -587,11 +795,26 @@ namespace GravityFlipLab.Stage
             OnCollectibleCollected?.Invoke(collectiblesRemaining);
         }
 
+        // Enhanced stage completion with checkpoint statistics
         public void CompleteStage()
         {
             float completionTime = Time.time - stageStartTime;
             int energyChipsCollected = currentStageData.stageInfo.energyChipCount - collectiblesRemaining;
 
+            // Get checkpoint statistics
+            if (useEnhancedCheckpointSystem && CheckpointManager.Instance != null)
+            {
+                var checkpointStats = CheckpointManager.Instance.GetCheckpointStatistics();
+                Debug.Log($"Stage completed with checkpoint stats: {checkpointStats}");
+
+                // Store checkpoint completion data
+                if (GameManager.Instance != null)
+                {
+                    Debug.Log($"Checkpoint completion: {checkpointStats.completionPercentage:F1}%");
+                }
+            }
+
+            // Call original completion logic
             GameManager.Instance.CompleteStage(completionTime, GameManager.Instance.sessionDeathCount, energyChipsCollected);
             OnStageCompleted?.Invoke();
         }
@@ -609,7 +832,7 @@ namespace GravityFlipLab.Stage
             }
         }
 
-        // 新規追加: ゴール関連のパブリックメソッド
+        // ゴール関連のパブリックメソッド
         public void SetGoalPosition(Vector3 position)
         {
             if (currentStageData?.stageInfo != null)
@@ -647,7 +870,7 @@ namespace GravityFlipLab.Stage
             return currentGoal;
         }
 
-        // 新規追加: プレイヤー関連のパブリックメソッド
+        // プレイヤー関連のパブリックメソッド
         public void SetPlayerPosition(Vector3 position)
         {
             if (currentStageData?.stageInfo != null)
@@ -677,7 +900,107 @@ namespace GravityFlipLab.Stage
             return currentPlayer;
         }
 
-        // 新規追加: デフォルトゴールスプライト作成
+        // Enhanced checkpoint management methods
+        public void ResetAllCheckpoints()
+        {
+            // Find all checkpoint triggers and reset them
+            CheckpointTrigger[] checkpoints = FindObjectsByType<CheckpointTrigger>(FindObjectsSortMode.None);
+
+            foreach (var checkpoint in checkpoints)
+            {
+                checkpoint.ResetCheckpoint();
+            }
+
+            // Reset checkpoint manager
+            if (CheckpointManager.Instance != null)
+            {
+                CheckpointManager.Instance.ResetToDefaultCheckpoint();
+            }
+
+            Debug.Log($"Reset {checkpoints.Length} checkpoints");
+        }
+
+        public float GetCheckpointCompletionPercentage()
+        {
+            if (useEnhancedCheckpointSystem && CheckpointManager.Instance != null)
+            {
+                var stats = CheckpointManager.Instance.GetCheckpointStatistics();
+                return stats.completionPercentage;
+            }
+
+            return 0f;
+        }
+
+        public bool ValidateCheckpointPlacements()
+        {
+            if (currentStageData?.stageInfo?.checkpointPositions == null) return true;
+
+            bool allValid = true;
+
+            foreach (var checkpointPos in currentStageData.stageInfo.checkpointPositions)
+            {
+                // Check if checkpoint position is accessible
+                if (!IsPositionAccessible(checkpointPos))
+                {
+                    Debug.LogWarning($"Checkpoint at {checkpointPos} may not be accessible");
+                    allValid = false;
+                }
+
+                // Check if checkpoint has ground nearby
+                if (!HasGroundNearby(checkpointPos))
+                {
+                    Debug.LogWarning($"Checkpoint at {checkpointPos} has no ground nearby");
+                    allValid = false;
+                }
+            }
+
+            return allValid;
+        }
+
+        private bool IsPositionAccessible(Vector3 position)
+        {
+            // Check if there are obstacles blocking the checkpoint
+            Collider2D obstacle = Physics2D.OverlapPoint(position, LayerMask.GetMask("Obstacles"));
+            return obstacle == null;
+        }
+
+        private bool HasGroundNearby(Vector3 position)
+        {
+            // Check if there's ground within reasonable distance
+            float checkDistance = 10f;
+            RaycastHit2D groundCheck = Physics2D.Raycast(position, Vector2.down, checkDistance, groundLayerMask);
+            return groundCheck.collider != null;
+        }
+
+        // Checkpoint configuration methods
+        public void SetCheckpointSpacing(float spacing)
+        {
+            checkpointSpacing = Mathf.Max(100f, spacing);
+        }
+
+        public void SetUseEnhancedCheckpointSystem(bool useEnhanced)
+        {
+            useEnhancedCheckpointSystem = useEnhanced;
+        }
+
+        public int GetActiveCheckpointCount()
+        {
+            CheckpointTrigger[] checkpoints = FindObjectsByType<CheckpointTrigger>(FindObjectsSortMode.None);
+            return checkpoints.Length;
+        }
+
+        public List<Vector3> GetAllCheckpointPositions()
+        {
+            List<Vector3> positions = new List<Vector3>();
+            CheckpointTrigger[] checkpoints = FindObjectsByType<CheckpointTrigger>(FindObjectsSortMode.None);
+
+            foreach (var checkpoint in checkpoints)
+            {
+                positions.Add(checkpoint.checkpointPosition);
+            }
+
+            return positions;
+        }
 
         // Prefab getters
         private GameObject GetObstaclePrefab(ObstacleType type)
@@ -863,6 +1186,116 @@ namespace GravityFlipLab.Stage
             int seed = x * 1000 + y;
             System.Random random = new System.Random(seed);
             return tiles[random.Next(tiles.Length)];
+        }
+
+        // Debug and visualization
+        private void OnDrawGizmosSelected()
+        {
+            if (!Application.isPlaying || !useEnhancedCheckpointSystem) return;
+
+            // Draw checkpoint connections
+            if (currentStageData?.stageInfo?.checkpointPositions != null)
+            {
+                Gizmos.color = Color.green;
+
+                Vector3 lastPos = currentStageData.stageInfo.playerStartPosition;
+                foreach (var checkpointPos in currentStageData.stageInfo.checkpointPositions)
+                {
+                    Gizmos.DrawLine(lastPos, checkpointPos);
+                    Gizmos.DrawWireSphere(checkpointPos, 1f);
+                    lastPos = checkpointPos;
+                }
+
+                // Draw line to goal
+                Gizmos.DrawLine(lastPos, currentStageData.stageInfo.goalPosition);
+            }
+
+            // Draw auto-generated checkpoint positions
+            if (currentStageData?.stageInfo != null)
+            {
+                Gizmos.color = Color.yellow;
+                float stageLength = currentStageData.stageInfo.stageLength;
+                Vector3 startPos = currentStageData.stageInfo.playerStartPosition;
+
+                int checkpointCount = Mathf.FloorToInt(stageLength / checkpointSpacing);
+                for (int i = 1; i <= checkpointCount; i++)
+                {
+                    Vector3 autoCheckpointPos = startPos + Vector3.right * (checkpointSpacing * i);
+                    autoCheckpointPos.y = FindGroundLevel(autoCheckpointPos.x);
+                    Gizmos.DrawWireCube(autoCheckpointPos, Vector3.one * 0.5f);
+                }
+            }
+        }
+
+        // Stage statistics for debugging and analytics
+        [System.Serializable]
+        public class StageStatistics
+        {
+            public float stageCompletionTime;
+            public int totalCheckpoints;
+            public int activatedCheckpoints;
+            public int totalCollectibles;
+            public int collectedItems;
+            public int deathCount;
+            public float checkpointCompletionPercentage;
+
+            public override string ToString()
+            {
+                return $"Stage Stats - Time: {stageCompletionTime:F1}s, " +
+                       $"Checkpoints: {activatedCheckpoints}/{totalCheckpoints} ({checkpointCompletionPercentage:F1}%), " +
+                       $"Items: {collectedItems}/{totalCollectibles}, Deaths: {deathCount}";
+            }
+        }
+
+        public StageStatistics GetStageStatistics()
+        {
+            StageStatistics stats = new StageStatistics();
+
+            stats.stageCompletionTime = stageLoaded ? Time.time - stageStartTime : 0f;
+            stats.totalCollectibles = currentStageData?.stageInfo?.energyChipCount ?? 0;
+            stats.collectedItems = stats.totalCollectibles - collectiblesRemaining;
+            stats.deathCount = GameManager.Instance?.sessionDeathCount ?? 0;
+
+            if (useEnhancedCheckpointSystem && CheckpointManager.Instance != null)
+            {
+                var checkpointStats = CheckpointManager.Instance.GetCheckpointStatistics();
+                stats.totalCheckpoints = checkpointStats.totalCheckpoints;
+                stats.activatedCheckpoints = checkpointStats.activatedCheckpoints;
+                stats.checkpointCompletionPercentage = checkpointStats.completionPercentage;
+            }
+            else
+            {
+                stats.totalCheckpoints = GetActiveCheckpointCount();
+                stats.activatedCheckpoints = 0; // Basic system doesn't track activation
+                stats.checkpointCompletionPercentage = 0f;
+            }
+
+            return stats;
+        }
+
+        // Integration methods for external systems
+        public void NotifyPlayerDeath()
+        {
+            // This can be called by external systems to notify stage manager of player death
+            if (useEnhancedCheckpointSystem)
+            {
+                Debug.Log("Player death notification received - enhanced respawn system will handle");
+            }
+        }
+
+        public void NotifyPlayerRespawn()
+        {
+            // This can be called by external systems to notify stage manager of player respawn
+            if (useEnhancedCheckpointSystem)
+            {
+                Debug.Log("Player respawn notification received");
+            }
+        }
+
+        public void NotifyCheckpointActivated(Vector3 checkpointPosition)
+        {
+            // This can be called when a checkpoint is activated
+            Debug.Log($"Checkpoint activated notification: {checkpointPosition}");
         }
     }
     #endregion

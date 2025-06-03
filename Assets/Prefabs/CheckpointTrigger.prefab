@@ -148,3 +148,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   checkpointPosition: {x: 0, y: 0, z: 0}
+  useTransformPosition: 1
+  isReusable: 0
+  activationCooldown: 0.5
+  inactiveVisual: {fileID: 0}
+  activeVisual: {fileID: 0}
+  activationParticles: {fileID: 0}
+  enableGlow: 1
+  activationSound: {fileID: 0}
+  audioSource: {fileID: 0}
+  saveGravityState: 1
+  saveVelocityState: 0
+  requireGrounded: 0
+  playerLayerMask:
+    serializedVersion: 2
+    m_Bits: 4096
