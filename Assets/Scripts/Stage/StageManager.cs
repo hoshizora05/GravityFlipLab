@@ -46,6 +46,10 @@ namespace GravityFlipLab.Stage
         public Tilemap foregroundTilemap;
         public TilemapCollider2D foregroundCollider;
 
+        [Header("Goal Settings")]
+        public GameObject goalPrefab; // ゴールプレハブの参照
+        private GameObject currentGoal; // 現在のゴールオブジェクト
+
         [Header("Prefab References")]
         public GameObject[] obstaclePrefabs = new GameObject[8]; // One for each ObstacleType
         public GameObject[] collectiblePrefabs = new GameObject[3]; // One for each CollectibleType
@@ -71,6 +75,11 @@ namespace GravityFlipLab.Stage
         public static event System.Action OnStageLoaded;
         public static event System.Action OnStageCompleted;
         public static event System.Action<int> OnCollectibleCollected;
+
+        [Header("Tilemap System")]
+        public TilemapGroundManager tilemapGroundManager;
+        public bool useTilemapTerrain = true;
+        public LayerMask groundLayerMask = 1;
 
         private void Awake()
         {
@@ -188,6 +197,9 @@ namespace GravityFlipLab.Stage
             // Load environmental objects
             yield return StartCoroutine(LoadEnvironmental());
 
+            // Setup goal - 新規追加
+            SetupGoal();
+
             //yield return StartCoroutine(SetupTerrain());
 
             // Initialize stage
@@ -195,6 +207,87 @@ namespace GravityFlipLab.Stage
 
             stageLoaded = true;
             OnStageLoaded?.Invoke();
+        }
+
+        // 新規追加: ゴールセットアップメソッド
+        private void SetupGoal()
+        {
+            if (currentStageData?.stageInfo == null) return;
+
+            Vector3 goalPosition = currentStageData.stageInfo.goalPosition;
+
+            // ゴールプレハブが設定されている場合
+            if (goalPrefab != null)
+            {
+                currentGoal = Instantiate(goalPrefab);
+                currentGoal.transform.position = goalPosition;
+                currentGoal.name = "StageGoal";
+
+                // GoalTriggerコンポーネントの取得と設定
+                GoalTrigger goalTrigger = currentGoal.GetComponent<GoalTrigger>();
+                if (goalTrigger != null)
+                {
+                    goalTrigger.SetGoalPosition(goalPosition);
+                }
+
+                Debug.Log($"Goal created at position: {goalPosition}");
+            }
+            else
+            {
+                // プレハブが設定されていない場合、シンプルなゴールを作成
+                CreateDefaultGoal(goalPosition);
+            }
+        }
+
+        // 新規追加: デフォルトゴール作成メソッド
+        private void CreateDefaultGoal(Vector3 position)
+        {
+            currentGoal = new GameObject("StageGoal");
+            currentGoal.transform.position = position;
+
+            // ビジュアルコンポーネントの追加
+            SpriteRenderer renderer = currentGoal.AddComponent<SpriteRenderer>();
+            renderer.color = Color.yellow;
+            // 基本的な四角形スプライトを設定（実際の開発ではゴール用スプライトを使用）
+            renderer.sprite = CreateDefaultGoalSprite();
+
+            // コライダーの追加
+            BoxCollider2D collider = currentGoal.AddComponent<BoxCollider2D>();
+            collider.isTrigger = true;
+            collider.size = new Vector2(2f, 3f); // プレイヤーより大きめに設定
+
+            // ライトエフェクトの追加
+            Light goalLight = currentGoal.AddComponent<Light>();
+            goalLight.type = LightType.Point;
+            goalLight.color = Color.yellow;
+            goalLight.intensity = 2f;
+            goalLight.range = 5f;
+
+            // GoalTriggerコンポーネントの追加
+            GoalTrigger goalTrigger = currentGoal.AddComponent<GoalTrigger>();
+            goalTrigger.goalRenderer = renderer;
+            goalTrigger.goalLight = goalLight;
+            goalTrigger.SetGoalPosition(position);
+
+            Debug.Log($"Default goal created at position: {position}");
+        }
+
+        // 新規追加: デフォルトゴールスプライト作成
+        private Sprite CreateDefaultGoalSprite()
+        {
+            // 32x32の黄色い四角形テクスチャを作成
+            Texture2D texture = new Texture2D(32, 32);
+            Color[] pixels = new Color[32 * 32];
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = Color.yellow;
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f), 16f);
         }
 
         private IEnumerator SetupBackground()
@@ -379,6 +472,13 @@ namespace GravityFlipLab.Stage
             }
             environmentalObjects.Clear();
 
+            // Clear goal - 新規追加
+            if (currentGoal != null)
+            {
+                DestroyImmediate(currentGoal);
+                currentGoal = null;
+            }
+
             // Clear stage segments
             foreach (var segment in activeSegments)
             {
@@ -417,6 +517,44 @@ namespace GravityFlipLab.Stage
                     parallaxManager.SetParallaxFactor(i, originalFactor * speedMultiplier);
                 }
             }
+        }
+
+        // 新規追加: ゴール関連のパブリックメソッド
+        public void SetGoalPosition(Vector3 position)
+        {
+            if (currentStageData?.stageInfo != null)
+            {
+                currentStageData.stageInfo.goalPosition = position;
+
+                // 既存のゴールがあれば位置を更新
+                if (currentGoal != null)
+                {
+                    GoalTrigger goalTrigger = currentGoal.GetComponent<GoalTrigger>();
+                    if (goalTrigger != null)
+                    {
+                        goalTrigger.SetGoalPosition(position);
+                    }
+                    else
+                    {
+                        currentGoal.transform.position = position;
+                    }
+                }
+            }
+        }
+
+        public Vector3 GetGoalPosition()
+        {
+            return currentStageData?.stageInfo?.goalPosition ?? Vector3.zero;
+        }
+
+        public bool HasGoal()
+        {
+            return currentGoal != null;
+        }
+
+        public GameObject GetCurrentGoal()
+        {
+            return currentGoal;
         }
 
         // Prefab getters
@@ -463,11 +601,6 @@ namespace GravityFlipLab.Stage
                     break;
             }
         }
-
-        [Header("Tilemap System")]
-        public TilemapGroundManager tilemapGroundManager;
-        public bool useTilemapTerrain = true;
-        public LayerMask groundLayerMask = 1;
 
         // Tilemap地形の初期化を追加
         private IEnumerator SetupTerrain()

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7458713809327413555}
   - component: {fileID: 6194831840762257207}
   - component: {fileID: 4430422041789716610}
+  - component: {fileID: -3785915857157943364}
   m_Layer: 0
   m_Name: Goal
   m_TagString: Goal
@@ -134,3 +135,24 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &-3785915857157943364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1412176488493205532}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28fc34a49c5e0f04da15abd132798f96, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rotationSpeed: 90
+  bobHeight: 0.3
+  bobSpeed: 1.5
+  glowIntensity: 2
+  goalEffect: {fileID: 0}
+  goalReachedSound: {fileID: 0}
+  goalColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  goalRenderer: {fileID: 6194831840762257207}
+  goalLight: {fileID: 0}
