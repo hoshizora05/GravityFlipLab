@@ -768,111 +768,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 368511702}
   m_CullTransparentMesh: 1
---- !u!1001 &404810048
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 872046611823939326, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2230049414761278484, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2324556002733227572, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2324556002733227572, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: autoRunSpeed
-      value: 5
-      objectReference: {fileID: 0}
-    - target: {fileID: 2324556002733227572, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: groundCheckPoint
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 2324556002733227572, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: groundLayerMask.m_Bits
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3458361796981271630, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3608284467634561112, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Name
-      value: SYNC-01_Player
-      objectReference: {fileID: 0}
-    - target: {fileID: 3767698684334273367, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4099288271902782470, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4213869291999496872, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_IsTrigger
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4990486651199994385, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8919105931476469903, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
 --- !u!1 &411778077
 GameObject:
   m_ObjectHideFlags: 0
@@ -1391,6 +1286,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   initializeOnAwake: 1
   initializationDelay: 0.1
+  manageFadeTransitions: 1
 --- !u!4 &508993731
 Transform:
   m_ObjectHideFlags: 0
@@ -1568,6 +1464,8 @@ MonoBehaviour:
   cameraController: {fileID: 1054947804}
   foregroundTilemap: {fileID: 0}
   foregroundCollider: {fileID: 0}
+  goalPrefab: {fileID: 1412176488493205532, guid: 25bc9e42b5e8d3c4d95b660b15d8320a, type: 3}
+  playerPrefab: {fileID: 3608284467634561112, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
   obstaclePrefabs:
   - {fileID: 2427247530994779155, guid: c07623563c241c44f83c743b1822b6ef, type: 3}
   - {fileID: 1425810193327305883, guid: 6bcc9a5a929a42a4294c3fd046909fe7, type: 3}
@@ -2113,11 +2011,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 933090327}
   m_CullTransparentMesh: 1
---- !u!4 &961858151 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 8852317743026392751, guid: 3531bb52f37136546a314d7e2b9f5ac4, type: 3}
-  m_PrefabInstance: {fileID: 404810048}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1054947799
 GameObject:
   m_ObjectHideFlags: 0
@@ -2268,7 +2161,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97249124df356f04caf880f29d1833d7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  target: {fileID: 961858151}
+  target: {fileID: 0}
   followSpeed: 2
   lookAheadDistance: 3
   offset: {x: 0, y: 0}
@@ -2290,6 +2183,7 @@ GameObject:
   - component: {fileID: 1090980004}
   - component: {fileID: 1090980003}
   - component: {fileID: 1090980005}
+  - component: {fileID: 1090980006}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -2378,6 +2272,20 @@ MonoBehaviour:
   gravityZones: []
   debugMode: 0
   showGravityVectors: 0
+--- !u!114 &1090980006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1090980002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10f62e64b0a412e41bbd5e81bee5a295, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fadeDuration: 1
+  fadeColor: {r: 0, g: 0, b: 0, a: 1}
 --- !u!1 &1111589729
 GameObject:
   m_ObjectHideFlags: 0
@@ -2782,6 +2690,55 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &1426340505
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1426340507}
+  - component: {fileID: 1426340506}
+  m_Layer: 0
+  m_Name: GameObject (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1426340506
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1426340505}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5d589e614b56f5478916f7f7dd76246, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  autoSetupOnStart: 0
+  createSampleStage: 0
+  stageManager: {fileID: 0}
+  groundManager: {fileID: 0}
+  sampleStageData: {fileID: 1820218735}
+--- !u!4 &1426340507
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1426340505}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.3589845, y: 0.38541448, z: 0.0011919816}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1451777832
 GameObject:
   m_ObjectHideFlags: 0
@@ -3036,6 +2993,396 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1913573559}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1820218735
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a79e90db22e6e2499c652f485f46737, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stageInfo:
+    worldNumber: 1
+    stageNumber: 1
+    stageName: Sample Tutorial Stage
+    timeLimit: 300
+    energyChipCount: 3
+    playerStartPosition: {x: 2, y: 0, z: 0}
+    goalPosition: {x: 60, y: 0, z: 0}
+    checkpointPositions:
+    - {x: 16, y: 0, z: 0}
+    - {x: 32, y: 0, z: 0}
+    - {x: 48, y: 0, z: 0}
+    theme: 0
+    stageLength: 4096
+    stageHeight: 1024
+    segmentCount: 16
+  backgroundLayers:
+  - layerName: 
+    backgroundSprite: {fileID: 0}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  - layerName: 
+    backgroundSprite: {fileID: 0}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  - layerName: 
+    backgroundSprite: {fileID: 0}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  obstacles:
+  - type: 0
+    position: {x: 20, y: -2, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  - type: 1
+    position: {x: 35, y: 0, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 3, z: 1}
+  - type: 2
+    position: {x: 45, y: 5, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  collectibles:
+  - type: 0
+    position: {x: 15, y: 2, z: 0}
+    value: 1
+  - type: 0
+    position: {x: 30, y: 4, z: 0}
+    value: 1
+  - type: 0
+    position: {x: 50, y: 1, z: 0}
+    value: 1
+  environmental: []
+  terrainLayers:
+  - layerName: Main Ground
+    layerType: 0
+    sortingOrder: 0
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 1
+    baseHeight: -5
+    thickness: 3
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  - layerName: Platforms
+    layerType: 1
+    sortingOrder: 10
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 0
+    baseHeight: 2
+    thickness: 1
+    generationMode: 3
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  - layerName: Background Decoration
+    layerType: 2
+    sortingOrder: -10
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 0
+    baseHeight: -10
+    thickness: 1
+    generationMode: 3
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  terrainSegments:
+  - segmentIndex: 0
+    startPosition: {x: 0, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 1
+    startPosition: {x: 16, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 2
+    startPosition: {x: 32, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 1
+    heightVariation: 2
+    platforms: []
+    features: []
+  - segmentIndex: 3
+    startPosition: {x: 48, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 4
+    heightVariation: 3
+    platforms: []
+    features: []
+  - segmentIndex: 4
+    startPosition: {x: 64, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 5
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 5
+    startPosition: {x: 80, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 6
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 6
+    startPosition: {x: 96, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 6
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 7
+    startPosition: {x: 112, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 7
+    heightVariation: 0
+    platforms:
+    - position: {x: 116, y: 0}
+      size: {x: 4, y: 1}
+      platformType: 0
+      moveSpeed: 0
+      movePath: []
+      isOneWay: 0
+      fallDelay: 1
+      disappearTime: 2
+      reappearTime: 3
+      conveyorDirection: {x: 1, y: 0}
+    - position: {x: 122, y: 3}
+      size: {x: 3, y: 1}
+      platformType: 0
+      moveSpeed: 0
+      movePath: []
+      isOneWay: 0
+      fallDelay: 1
+      disappearTime: 2
+      reappearTime: 3
+      conveyorDirection: {x: 1, y: 0}
+    features: []
+  - segmentIndex: 8
+    startPosition: {x: 128, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 7
+    heightVariation: 0
+    platforms:
+    - position: {x: 134, y: 0}
+      size: {x: 3, y: 1}
+      platformType: 1
+      moveSpeed: 2
+      movePath:
+      - {x: 0, y: 0}
+      - {x: 0, y: 4}
+      - {x: 4, y: 4}
+      - {x: 4, y: 0}
+      isOneWay: 0
+      fallDelay: 1
+      disappearTime: 2
+      reappearTime: 3
+      conveyorDirection: {x: 1, y: 0}
+    features: []
+  - segmentIndex: 9
+    startPosition: {x: 144, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 3
+    heightVariation: 4
+    platforms: []
+    features: []
+  - segmentIndex: 10
+    startPosition: {x: 160, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features:
+    - position: {x: 166, y: -2}
+      featureType: 0
+      size: {x: 1, y: 1}
+      isHazardous: 1
+      damageAmount: 1
+      isDecorative: 1
+    - position: {x: 170, y: -2}
+      featureType: 0
+      size: {x: 1, y: 1}
+      isHazardous: 1
+      damageAmount: 1
+      isDecorative: 1
+  - segmentIndex: 11
+    startPosition: {x: 176, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features:
+    - position: {x: 178, y: -2}
+      featureType: 2
+      size: {x: 8, y: 4}
+      isHazardous: 0
+      damageAmount: 1
+      isDecorative: 1
+  - segmentIndex: 12
+    startPosition: {x: 192, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 2
+    heightVariation: 3
+    platforms: []
+    features: []
+  - segmentIndex: 13
+    startPosition: {x: 208, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 14
+    startPosition: {x: 224, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 15
+    startPosition: {x: 240, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  tileMapSize: {x: 256, y: 64}
+  tileSize: 16
+  useCompositeCollider: 1
+  heightMap: {fileID: 0}
+  terrainCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  enableProceduralGeneration: 0
+  proceduralSeed: 0
 --- !u!1 &1824097745
 GameObject:
   m_ObjectHideFlags: 0
@@ -3709,7 +4056,7 @@ SceneRoots:
   - {fileID: 795846105}
   - {fileID: 1877045681}
   - {fileID: 219934040}
-  - {fileID: 404810048}
   - {fileID: 731002913}
   - {fileID: 1913573559}
   - {fileID: 1090980004}
+  - {fileID: 1426340507}

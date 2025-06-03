@@ -213,20 +213,21 @@ namespace GravityFlipLab.Stage
 
         private IEnumerator CompleteStageSequence()
         {
-            // プレイヤーの動きを停止
-            var player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-            {
-                var rb = player.GetComponent<Rigidbody2D>();
-                if (rb != null)
-                {
-                    rb.linearVelocity = Vector2.zero;
-                    rb.bodyType = RigidbodyType2D.Kinematic;
-                }
-            }
+            // PlayerStageAdapterのReachGoalでやるのでコメントアウト
+            //// プレイヤーの動きを停止
+            //var player = GameObject.FindGameObjectWithTag("Player");
+            //if (player != null)
+            //{
+            //    var rb = player.GetComponent<Rigidbody2D>();
+            //    if (rb != null)
+            //    {
+            //        rb.linearVelocity = Vector2.zero;
+            //        rb.bodyType = RigidbodyType2D.Kinematic;
+            //    }
+            //}
 
             // ステージクリア処理を実行
-            var playerStageAdapter = FindObjectOfType<PlayerStageAdapter>();
+            var playerStageAdapter = FindFirstObjectByType<PlayerStageAdapter>();
             if (playerStageAdapter != null)
             {
                 playerStageAdapter.ReachGoal();

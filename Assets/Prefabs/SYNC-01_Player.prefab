@@ -5193,15 +5193,15 @@ MonoBehaviour:
     slopeDeceleration: 0.8
     maxSlopeAngle: 50
     enableSlopeBoost: 1
-    airResistance: 0.98
-    terminalVelocity: 25
+    airResistance: 0.995
+    terminalVelocity: 50
     airControlFactor: 0.1
     groundFriction: 0.99
     bounceThreshold: 10
     bounceDamping: 0.7
-    enableMomentumConservation: 1
+    enableMomentumConservation: 0
     enablePhysicsIntegration: 1
-    velocitySmoothing: 0.1
+    velocitySmoothing: 0.02
   groundLayerMask:
     serializedVersion: 2
     m_Bits: 256
@@ -5312,8 +5312,8 @@ MonoBehaviour:
   stats:
     moveSpeed: 5
     fallSpeed: 10
-    maxFallSpeed: 20
-    gravityScale: 1
+    maxFallSpeed: 50
+    gravityScale: 1.5
     gravityFlipCooldown: 0.1
     flipInvincibilityDuration: 0.1
     preserveHorizontalMomentum: 1
@@ -5321,9 +5321,9 @@ MonoBehaviour:
     invincibilityDuration: 0.1
     isInvincible: 0
     livesRemaining: 3
-    airDrag: 0.95
+    airDrag: 0.99
     groundFriction: 0.98
-    maxVelocityMagnitude: 25
+    maxVelocityMagnitude: 50
   groundLayerMask:
     serializedVersion: 2
     m_Bits: 256

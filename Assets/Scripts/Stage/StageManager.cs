@@ -50,6 +50,10 @@ namespace GravityFlipLab.Stage
         public GameObject goalPrefab; // ゴールプレハブの参照
         private GameObject currentGoal; // 現在のゴールオブジェクト
 
+        [Header("Player Settings")]
+        public GameObject playerPrefab; // プレイヤープレハブの参照
+        private GameObject currentPlayer; // 現在のプレイヤーオブジェクト
+
         [Header("Prefab References")]
         public GameObject[] obstaclePrefabs = new GameObject[8]; // One for each ObstacleType
         public GameObject[] collectiblePrefabs = new GameObject[3]; // One for each CollectibleType
@@ -200,6 +204,9 @@ namespace GravityFlipLab.Stage
             // Setup goal - 新規追加
             SetupGoal();
 
+            // Setup player - 新規追加
+            SetupPlayer();
+
             //yield return StartCoroutine(SetupTerrain());
 
             // Initialize stage
@@ -272,7 +279,90 @@ namespace GravityFlipLab.Stage
             Debug.Log($"Default goal created at position: {position}");
         }
 
-        // 新規追加: デフォルトゴールスプライト作成
+        // 新規追加: プレイヤーセットアップメソッド
+        private void SetupPlayer()
+        {
+            if (currentStageData?.stageInfo == null) return;
+
+            Vector3 playerStartPosition = currentStageData.stageInfo.playerStartPosition;
+
+            // 既存のプレイヤーがあれば削除
+            if (currentPlayer != null)
+            {
+                DestroyImmediate(currentPlayer);
+                currentPlayer = null;
+            }
+
+            // シーン内の既存プレイヤーもクリア
+            GameObject existingPlayer = GameObject.FindGameObjectWithTag("Player");
+            if (existingPlayer != null)
+            {
+                DestroyImmediate(existingPlayer);
+            }
+
+            // プレイヤープレハブが設定されている場合
+            if (playerPrefab != null)
+            {
+                currentPlayer = Instantiate(playerPrefab);
+                currentPlayer.transform.position = playerStartPosition;
+                currentPlayer.name = "Player";
+
+                // タグを確実に設定
+                currentPlayer.tag = "Player";
+
+                Debug.Log($"Player created at position: {playerStartPosition}");
+            }
+            else
+            {
+                // プレハブが設定されていない場合、シンプルなプレイヤーを作成
+                CreateDefaultPlayer(playerStartPosition);
+            }
+        }
+
+        // 新規追加: デフォルトプレイヤー作成メソッド
+        private void CreateDefaultPlayer(Vector3 position)
+        {
+            currentPlayer = new GameObject("Player");
+            currentPlayer.transform.position = position;
+            currentPlayer.tag = "Player";
+
+            // 基本的なビジュアルコンポーネント
+            SpriteRenderer renderer = currentPlayer.AddComponent<SpriteRenderer>();
+            renderer.color = Color.blue;
+            renderer.sprite = CreateDefaultPlayerSprite();
+
+            // 物理コンポーネント
+            Rigidbody2D rb = currentPlayer.AddComponent<Rigidbody2D>();
+            rb.freezeRotation = true;
+            rb.gravityScale = 1f;
+
+            // コライダー
+            BoxCollider2D collider = currentPlayer.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(0.8f, 1.6f);
+
+            // プレイヤーコントローラー（簡易版）
+            var playerController = currentPlayer.AddComponent<GravityFlipLab.Player.PlayerController>();
+
+            Debug.Log($"Default player created at position: {position}");
+        }
+
+        // 新規追加: デフォルトプレイヤースプライト作成
+        private Sprite CreateDefaultPlayerSprite()
+        {
+            // 16x32の青い四角形テクスチャを作成（プレイヤー形状）
+            Texture2D texture = new Texture2D(16, 32);
+            Color[] pixels = new Color[16 * 32];
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = Color.blue;
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, 16, 32), new Vector2(0.5f, 0.5f), 16f);
+        }
         private Sprite CreateDefaultGoalSprite()
         {
             // 32x32の黄色い四角形テクスチャを作成
@@ -402,19 +492,6 @@ namespace GravityFlipLab.Stage
         {
             stageStartTime = Time.time;
 
-            // Initialize player position
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-            {
-                player.transform.position = currentStageData.stageInfo.playerStartPosition;
-
-                // Set camera target
-                if (cameraController != null)
-                {
-                    cameraController.SetTarget(player.transform);
-                }
-            }
-
             // Set up checkpoints
             SetupCheckpoints();
 
@@ -422,6 +499,12 @@ namespace GravityFlipLab.Stage
             foreach (var obstacle in activeObstacles)
             {
                 obstacle.StartObstacle();
+            }
+
+            // Set camera target to player if both exist
+            if (cameraController != null && currentPlayer != null)
+            {
+                cameraController.SetTarget(currentPlayer.transform);
             }
         }
 
@@ -477,6 +560,13 @@ namespace GravityFlipLab.Stage
             {
                 DestroyImmediate(currentGoal);
                 currentGoal = null;
+            }
+
+            // Clear player - 新規追加
+            if (currentPlayer != null)
+            {
+                DestroyImmediate(currentPlayer);
+                currentPlayer = null;
             }
 
             // Clear stage segments
@@ -556,6 +646,38 @@ namespace GravityFlipLab.Stage
         {
             return currentGoal;
         }
+
+        // 新規追加: プレイヤー関連のパブリックメソッド
+        public void SetPlayerPosition(Vector3 position)
+        {
+            if (currentStageData?.stageInfo != null)
+            {
+                currentStageData.stageInfo.playerStartPosition = position;
+
+                // 既存のプレイヤーがあれば位置を更新
+                if (currentPlayer != null)
+                {
+                    currentPlayer.transform.position = position;
+                }
+            }
+        }
+
+        public Vector3 GetPlayerStartPosition()
+        {
+            return currentStageData?.stageInfo?.playerStartPosition ?? Vector3.zero;
+        }
+
+        public bool HasPlayer()
+        {
+            return currentPlayer != null;
+        }
+
+        public GameObject GetCurrentPlayer()
+        {
+            return currentPlayer;
+        }
+
+        // 新規追加: デフォルトゴールスプライト作成
 
         // Prefab getters
         private GameObject GetObstaclePrefab(ObstacleType type)
