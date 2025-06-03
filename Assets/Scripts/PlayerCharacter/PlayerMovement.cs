@@ -88,33 +88,146 @@ namespace GravityFlipLab.Player
         private Vector2 movementForce;
         private Vector2 frictionForce;
 
+        // 初期化状態を追跡するフラグ
+        private bool isInitialized = false;
+
         public void Initialize(PlayerController controller)
         {
-            playerController = controller;
-            rb2d = GetComponent<Rigidbody2D>();
-            gravityAffected = GetComponent<GravityAffectedObject>();
+            // 既に初期化済みの場合は重要な参照のみ更新
+            if (isInitialized && controller != null)
+            {
+                playerController = controller;
+                if (showDebugInfo)
+                    Debug.Log("PlayerMovement: Updated controller reference (already initialized)");
+                return;
+            }
 
-            SetupGroundCheckPoints();
+            playerController = controller;
+
+            // コンポーネント参照の安全な取得
+            if (rb2d == null)
+                rb2d = GetComponent<Rigidbody2D>();
+
+            if (gravityAffected == null)
+                gravityAffected = GetComponent<GravityAffectedObject>();
+
+            // Ground check pointsの設定（既存のものがあれば保持）
+            if (groundCheckPoints == null || groundCheckPoints.Length == 0)
+            {
+                SetupGroundCheckPoints();
+            }
+
+            // Physics cacheの初期化
             InitializePhysicsCache();
 
+            // イベント購読（重複購読を防ぐ）
+            UnsubscribeFromEvents(); // 既存の購読をクリア
+            SubscribeToEvents();     // 新しく購読
+
+            isInitialized = true;
+
+            if (showDebugInfo)
+                Debug.Log("Enhanced PlayerMovement initialized with advanced physics");
+        }
+        /// <summary>
+        /// イベント購読処理
+        /// </summary>
+        private void SubscribeToEvents()
+        {
             // Subscribe to gravity system events
             if (GravitySystem.Instance != null)
             {
                 GravitySystem.OnGlobalGravityChanged += OnGravityChanged;
             }
-            // Subscribe to events
-            PlayerController.OnGravityFlip += OnGravityFlip;
 
-            if (showDebugInfo)
-                Debug.Log("Enhanced PlayerMovement initialized with advanced physics");
+            // Subscribe to player events
+            PlayerController.OnGravityFlip += OnGravityFlip;
         }
 
-        private void OnDestroy()
+        /// <summary>
+        /// イベント購読解除処理
+        /// </summary>
+        private void UnsubscribeFromEvents()
         {
+            // Unsubscribe from gravity system events
             if (GravitySystem.Instance != null)
             {
                 GravitySystem.OnGlobalGravityChanged -= OnGravityChanged;
             }
+
+            // Unsubscribe from player events
+            PlayerController.OnGravityFlip -= OnGravityFlip;
+        }
+
+        private void OnDestroy()
+        {
+            UnsubscribeFromEvents();
+        }
+
+        /// <summary>
+        /// 安全な再初期化メソッド
+        /// リスポーン時や緊急時に使用
+        /// </summary>
+        public void SafeReinitialize(PlayerController controller)
+        {
+            if (controller == null)
+            {
+                Debug.LogError("PlayerMovement: Cannot reinitialize with null controller");
+                return;
+            }
+
+            // 状態をリセット
+            isInitialized = false;
+
+            // 完全に再初期化
+            Initialize(controller);
+
+            // 物理状態の検証と修正
+            ValidatePhysicsState();
+
+            if (showDebugInfo)
+                Debug.Log("PlayerMovement: Safe reinitialization completed");
+        }
+
+        /// <summary>
+        /// コンポーネントの状態を検証
+        /// </summary>
+        public bool ValidateComponentState()
+        {
+            bool isValid = true;
+            List<string> errors = new List<string>();
+
+            if (playerController == null)
+            {
+                errors.Add("PlayerController reference is null");
+                isValid = false;
+            }
+
+            if (rb2d == null)
+            {
+                errors.Add("Rigidbody2D reference is null");
+                isValid = false;
+            }
+
+            if (groundCheckPoints == null || groundCheckPoints.Length == 0)
+            {
+                errors.Add("Ground check points not properly initialized");
+                isValid = false;
+            }
+
+            if (!isValid)
+            {
+                Debug.LogError($"PlayerMovement validation failed: {string.Join(", ", errors)}");
+
+                // 可能な場合は自動修復を試行
+                if (rb2d == null)
+                    rb2d = GetComponent<Rigidbody2D>();
+
+                if (groundCheckPoints == null || groundCheckPoints.Length == 0)
+                    SetupGroundCheckPoints();
+            }
+
+            return isValid;
         }
 
         private void SetupGroundCheckPoints()

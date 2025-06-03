@@ -425,7 +425,7 @@ namespace GravityFlipLab.Player
 
             yield return new WaitForSeconds(duration);
 
-            stats.isInvincible = false;
+               stats.isInvincible = false;
             if (playerVisuals != null)
                 playerVisuals.SetInvincibleVisuals(false);
         }
@@ -489,6 +489,24 @@ namespace GravityFlipLab.Player
             yield return new WaitForSeconds(1.0f);
             Respawn();
         }
+        /// <summary>
+        /// PlayerMovementコンポーネントの初期化を確実に実行
+        /// </summary>
+        private void InitializePlayerMovement()
+        {
+            var playerMovement = GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+            {
+                // PlayerMovementを初期化してnull参照を防ぐ
+                playerMovement.Initialize(this);
+
+                // 物理状態の検証
+                playerMovement.ValidatePhysicsState();
+
+                if (debugMode)
+                    Debug.Log("PlayerController: PlayerMovement reinitialized on respawn");
+            }
+        }
 
         public void Respawn()
         {
@@ -511,6 +529,9 @@ namespace GravityFlipLab.Player
                 gravityAffected.useCustomGravity = true;
                 gravityAffected.ResetToOriginalGravity();
             }
+
+            // PlayerMovementコンポーネントの再初期化
+            InitializePlayerMovement();
 
             // Reset visuals
             if (playerVisuals != null) playerVisuals.ResetVisuals();

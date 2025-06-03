@@ -157,6 +157,13 @@ MonoBehaviour:
   damageEffect: {fileID: 0}
   activationSound: {fileID: 0}
   damageSound: {fileID: 0}
+  useIntegratedRespawn: 1
+  bypassInvulnerability: 0
+  contactCooldown: 0.5
+  logContactEvents: 0
+  enableContactEffect: 1
+  dangerColor: {r: 1, g: 0, b: 0, a: 1}
+  flashDuration: 0.1
   pointsUp: 1
   spikeHeight: 1
   retractable: 0

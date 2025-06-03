@@ -315,6 +315,9 @@ namespace GravityFlipLab.Stage
                 // タグを確実に設定
                 currentPlayer.tag = "Player";
 
+                // プレイヤーコンポーネントの初期化
+                InitializePlayerComponents(currentPlayer);
+
                 Debug.Log($"Player created at position: {playerStartPosition}");
             }
             else
@@ -323,6 +326,84 @@ namespace GravityFlipLab.Stage
                 CreateDefaultPlayer(playerStartPosition);
             }
         }
+        /// <summary>
+        /// プレイヤーコンポーネントの適切な初期化
+        /// </summary>
+        private void InitializePlayerComponents(GameObject player)
+        {
+            if (player == null) return;
+
+            // PlayerControllerの取得
+            var playerController = player.GetComponent<PlayerController>();
+            if (playerController == null)
+            {
+                Debug.LogWarning("Player prefab does not have PlayerController component");
+                return;
+            }
+
+            // PlayerMovementの初期化
+            var playerMovement = player.GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+            {
+                playerMovement.Initialize(playerController);
+                Debug.Log("StageManager: PlayerMovement initialized");
+            }
+
+            // RespawnIntegrationの追加と初期化
+            var respawnIntegration = player.GetComponent<RespawnIntegration>();
+            if (respawnIntegration == null)
+            {
+                respawnIntegration = player.AddComponent<RespawnIntegration>();
+                Debug.Log("StageManager: RespawnIntegration component added");
+            }
+
+            // AdvancedGroundDetectorの初期化
+            var groundDetector = player.GetComponent<AdvancedGroundDetector>();
+            if (groundDetector != null)
+            {
+                groundDetector.ForceDetection();
+            }
+
+            // その他のコンポーネントの検証
+            ValidatePlayerComponents(player);
+        }
+        /// <summary>
+        /// プレイヤーコンポーネントの検証
+        /// </summary>
+        private void ValidatePlayerComponents(GameObject player)
+        {
+            var requiredComponents = new System.Type[]
+            {
+                typeof(PlayerController),
+                typeof(Rigidbody2D),
+                typeof(Collider2D),
+                typeof(GravityFlipLab.Physics.GravityAffectedObject)
+            };
+
+            foreach (var componentType in requiredComponents)
+            {
+                if (player.GetComponent(componentType) == null)
+                {
+                    Debug.LogWarning($"Player is missing required component: {componentType.Name}");
+                }
+            }
+
+            // PlayerMovementの状態検証
+            var playerMovement = player.GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+            {
+                if (!playerMovement.ValidateComponentState())
+                {
+                    Debug.LogWarning("PlayerMovement component validation failed, attempting to fix...");
+                    var playerController = player.GetComponent<PlayerController>();
+                    if (playerController != null)
+                    {
+                        playerMovement.SafeReinitialize(playerController);
+                    }
+                }
+            }
+        }
+
 
         // デフォルトプレイヤー作成メソッド
         private void CreateDefaultPlayer(Vector3 position)
@@ -345,10 +426,22 @@ namespace GravityFlipLab.Stage
             BoxCollider2D collider = currentPlayer.AddComponent<BoxCollider2D>();
             collider.size = new Vector2(0.8f, 1.6f);
 
-            // プレイヤーコントローラー（簡易版）
+            // GravityAffectedObject（必須）
+            var gravityAffected = currentPlayer.AddComponent<GravityFlipLab.Physics.GravityAffectedObject>();
+
+            // プレイヤーコントローラー
             var playerController = currentPlayer.AddComponent<GravityFlipLab.Player.PlayerController>();
 
-            Debug.Log($"Default player created at position: {position}");
+            // PlayerMovement（必須）
+            var playerMovement = currentPlayer.AddComponent<PlayerMovement>();
+
+            // RespawnIntegration
+            var respawnIntegration = currentPlayer.AddComponent<RespawnIntegration>();
+
+            // コンポーネントの初期化
+            InitializePlayerComponents(currentPlayer);
+
+            Debug.Log($"Default player created and initialized at position: {position}");
         }
 
         // デフォルトプレイヤースプライト作成

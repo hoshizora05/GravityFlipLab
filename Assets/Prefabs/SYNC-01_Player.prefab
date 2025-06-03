@@ -4976,6 +4976,7 @@ GameObject:
   - component: {fileID: 4882513865510784421}
   - component: {fileID: 1008834187971518196}
   - component: {fileID: 185831910818558098}
+  - component: {fileID: 8394136571936494225}
   m_Layer: 12
   m_Name: SYNC-01_Player
   m_TagString: Player
@@ -5232,6 +5233,8 @@ MonoBehaviour:
   checkpointLayerMask:
     serializedVersion: 2
     m_Bits: 2048
+  useEnhancedRespawn: 1
+  logCollisionEvents: 0
 --- !u!114 &8919105931476469903
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5320,7 +5323,7 @@ MonoBehaviour:
     verticalMomentumRetention: 0.3
     invincibilityDuration: 0.1
     isInvincible: 0
-    livesRemaining: 3
+    livesRemaining: 1
     airDrag: 0.99
     groundFriction: 0.98
     maxVelocityMagnitude: 50
@@ -5370,6 +5373,25 @@ MonoBehaviour:
   showDebugRays: 1
   showGroundInfo: 1
   logGroundChanges: 0
+--- !u!114 &8394136571936494225
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3608284467634561112}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7729b059567d5744b4b92db404b7de3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  respawnDelay: 0.5
+  enableRespawnEffect: 1
+  resetGravityOnRespawn: 1
+  logRespawnEvents: 0
+  invulnerabilityDuration: 1
+  maxConsecutiveDeaths: 5
+  emergencyRespawnDelay: 2
 --- !u!1 &4175828736110790596
 GameObject:
   m_ObjectHideFlags: 0
