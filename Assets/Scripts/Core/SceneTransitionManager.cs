@@ -49,6 +49,7 @@ namespace GravityFlipLab
 
         private bool isLoading = false;
         private string currentSceneName;
+        private bool isApplicationQuitting = false;
 
         private void Awake()
         {
@@ -56,10 +57,14 @@ namespace GravityFlipLab
             {
                 _instance = this;
                 DontDestroyOnLoad(gameObject);
+                isApplicationQuitting = false;
+                Debug.Log("SceneTransitionManager: Instance created with DontDestroyOnLoad");
             }
             else if (_instance != this)
             {
+                Debug.Log("SceneTransitionManager: Destroying duplicate instance");
                 Destroy(gameObject);
+                return;
             }
         }
 
@@ -138,11 +143,81 @@ namespace GravityFlipLab
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            Debug.Log($"Scene loaded: {scene.name}");
+            Debug.Log($"SceneTransitionManager: Scene loaded: {scene.name}");
 
             // Update game state based on scene
             GameState newState = GetGameStateFromScene(scene.name);
             GameManager.Instance.ChangeGameState(newState);
+
+            // シーン固有の初期化処理
+            HandleSceneSpecificInitialization(scene.name);
+        }
+
+        /// <summary>
+        /// シーン固有の初期化処理
+        /// </summary>
+        private void HandleSceneSpecificInitialization(string sceneName)
+        {
+            // GameSceneの場合はStageManagerに通知
+            if (sceneName == gameplaySceneName)
+            {
+                Debug.Log("SceneTransitionManager: Gameplay scene loaded, notifying StageManager");
+
+                // StageManagerの初期化を待つ
+                StartCoroutine(NotifyStageManagerAfterDelay());
+            }
+        }
+
+        /// <summary>
+        /// StageManagerに遅延通知（StageManagerの準備を待つ）
+        /// </summary>
+        private IEnumerator NotifyStageManagerAfterDelay()
+        {
+            // フレームを待ってStageManagerの準備を確認
+            yield return new WaitForEndOfFrame();
+
+            // StageManagerの検索（既存のものを探すのみ、作成はしない）
+            var stageManager = FindFirstObjectByType<Stage.StageManager>();
+            int attempts = 0;
+            const int maxAttempts = 10;
+
+            while (stageManager == null && attempts < maxAttempts)
+            {
+                yield return new WaitForSeconds(0.1f);
+                stageManager = FindFirstObjectByType<Stage.StageManager>();
+                attempts++;
+            }
+
+            if (stageManager != null)
+            {
+                Debug.Log("SceneTransitionManager: Found StageManager, sending scene loaded notification");
+                stageManager.OnSceneLoaded();
+            }
+            else
+            {
+                Debug.LogWarning("SceneTransitionManager: StageManager not found after scene load - it should be manually placed in the GameScene");
+
+                // StageManagerが見つからない場合のフォールバック：シンプルな作成
+                CreateBasicStageManager();
+            }
+        }
+
+        /// <summary>
+        /// StageManagerが見つからない場合の基本的なStageManager作成
+        /// </summary>
+        private void CreateBasicStageManager()
+        {
+            Debug.Log("SceneTransitionManager: Creating basic StageManager as fallback");
+
+            GameObject stageManagerObj = new GameObject("StageManager");
+            var stageManager = stageManagerObj.AddComponent<Stage.StageManager>();
+
+            // 基本的な初期化を試行
+            if (stageManager != null)
+            {
+                stageManager.OnSceneLoaded();
+                Debug.Log("SceneTransitionManager: Basic StageManager created and initialized");
+            }
         }
 
         private string GetSceneName(SceneType sceneType)
@@ -175,8 +250,76 @@ namespace GravityFlipLab
 
         private void OnDestroy()
         {
+            Debug.Log("SceneTransitionManager: OnDestroy called");
+
+            // アプリケーション終了中でない場合のみクリーンアップ
+            if (!isApplicationQuitting)
+            {
+                // イベントとリスナーのクリーンアップ
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+
+                // 進行中のコルーチンを停止
+                StopAllCoroutines();
+
+                Debug.Log("SceneTransitionManager: Cleanup completed (not during app quit)");
+            }
+        }
+
+        private void OnApplicationQuit()
+        {
+            Debug.Log("SceneTransitionManager: OnApplicationQuit called");
+            isApplicationQuitting = true;
+
+            // アプリケーション終了時のクリーンアップ
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            StopAllCoroutines();
+
+            // 静的イベントのクリーンアップ
+            OnSceneLoadStart = null;
+            OnSceneLoadComplete = null;
+
+            // インスタンス参照のクリア
+            _instance = null;
+
+            Debug.Log("SceneTransitionManager: Application quit cleanup completed");
+        }
+
+#if UNITY_EDITOR
+        // エディター専用：プレイモード終了時のクリーンアップ
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            // エディターでプレイモードが終了する際の処理
+            if (!hasFocus && !Application.isPlaying)
+            {
+                isApplicationQuitting = true;
+            }
+        }
+#endif
+
+        /// <summary>
+        /// 手動でのクリーンアップメソッド（必要に応じて外部から呼び出し）
+        /// </summary>
+        public static void ManualCleanup()
+        {
+            Debug.Log("SceneTransitionManager: Manual cleanup requested");
+
+            if (_instance != null)
+            {
+                _instance.isApplicationQuitting = true;
+
+                // イベントのクリーンアップ
+                SceneManager.sceneLoaded -= _instance.OnSceneLoaded;
+                OnSceneLoadStart = null;
+                OnSceneLoadComplete = null;
+
+                // インスタンスの破棄
+                if (_instance.gameObject != null)
+                {
+                    DestroyImmediate(_instance.gameObject);
+                }
+
+                _instance = null;
+            }
         }
     }
-
 }

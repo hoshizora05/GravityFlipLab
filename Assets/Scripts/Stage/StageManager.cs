@@ -19,14 +19,11 @@ namespace GravityFlipLab.Stage
         {
             get
             {
-                if (_instance == null)
+                // OnDestroy中やアプリケーション終了中は新しいインスタンスを作成しない
+                if (_instance == null && !isApplicationQuitting)
                 {
                     _instance = FindFirstObjectByType<StageManager>();
-                    if (_instance == null)
-                    {
-                        GameObject go = new GameObject("StageManager");
-                        _instance = go.AddComponent<StageManager>();
-                    }
+                    // シーン固有なので、見つからない場合は null を返す（動的生成しない）
                 }
                 return _instance;
             }
@@ -90,23 +87,220 @@ namespace GravityFlipLab.Stage
         public bool useTilemapTerrain = true;
         public LayerMask groundLayerMask = 1;
 
+        // シーン初期化状態の管理
+        private bool sceneInitialized = false;
+        private bool isInitializing = false;
+        private static bool isApplicationQuitting = false;
+
         private void Awake()
         {
-            if (_instance == null)
+            // StageManagerはシーン固有のため、重複チェックのみ行う
+            if (_instance != null && _instance != this)
             {
-                _instance = this;
-            }
-            else if (_instance != this)
-            {
+                Debug.Log("StageManager: Destroying duplicate instance");
                 Destroy(gameObject);
+                return;
             }
+
+            _instance = this;
+            sceneInitialized = false;
+            isInitializing = false;
+
+            Debug.Log("StageManager: Awake called - Scene-specific instance created");
+        }
+
+        private void OnDestroy()
+        {
+            Debug.Log("StageManager: OnDestroy called");
+
+            // OnDestroy中のフラグを設定
+            isApplicationQuitting = true;
+
+            // インスタンスのクリア（このインスタンスが破棄される場合のみ）
+            if (_instance == this)
+            {
+                _instance = null;
+                Debug.Log("StageManager: Instance reference cleared");
+            }
+
+            // StageManagerイベントの登録解除
+            OnStageLoaded = null;
+            OnStageCompleted = null;
+            OnCollectibleCollected = null;
+
+            // 進行中のコルーチンを停止
+            StopAllCoroutines();
+        }
+
+        private void OnApplicationQuit()
+        {
+            Debug.Log("StageManager: OnApplicationQuit called");
+            isApplicationQuitting = true;
+        }
+
+#if UNITY_EDITOR
+        // エディター専用：プレイモード終了検知
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void InitializeEditor()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
+
+        private static void OnPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
+        {
+            if (state == UnityEditor.PlayModeStateChange.ExitingPlayMode)
+            {
+                Debug.Log("StageManager: Editor play mode exiting");
+                isApplicationQuitting = true;
+
+                // インスタンス参照をクリア
+                _instance = null;
+
+                // 静的イベントをクリア
+                OnStageLoaded = null;
+                OnStageCompleted = null;
+                OnCollectibleCollected = null;
+            }
+        }
+#endif
+
+        /// <summary>
+        /// 手動でのクリーンアップメソッド
+        /// </summary>
+        public static void ManualCleanup()
+        {
+            Debug.Log("StageManager: Manual cleanup requested");
+
+            isApplicationQuitting = true;
+
+            // 静的イベントのクリーンアップ
+            OnStageLoaded = null;
+            OnStageCompleted = null;
+            OnCollectibleCollected = null;
+
+            // インスタンス参照のクリア
+            _instance = null;
         }
 
         private void Start()
         {
-            CreateParentObjects();
-            InitializeComponents();
-            LoadCurrentStage();
+            Debug.Log("StageManager: Start called");
+
+            // 既に初期化中の場合は重複実行を防ぐ
+            if (isInitializing)
+            {
+                Debug.Log("StageManager: Already initializing, skipping Start");
+                return;
+            }
+
+            StartCoroutine(InitializeStageManager());
+        }
+
+        private void OnEnable()
+        {
+            Debug.Log("StageManager: OnEnable called");
+
+            // シーン切り替え後の再有効化時にも初期化をチェック
+            if (!sceneInitialized && !isInitializing)
+            {
+                StartCoroutine(InitializeStageManager());
+            }
+        }
+
+        /// <summary>
+        /// StageManagerの完全な初期化プロセス
+        /// </summary>
+        private IEnumerator InitializeStageManager()
+        {
+            if (isInitializing)
+            {
+                Debug.Log("StageManager: Initialization already in progress");
+                yield break;
+            }
+
+            isInitializing = true;
+            Debug.Log("StageManager: Starting initialization process");
+
+            // フレームを待って他のシステムの初期化を待つ
+            yield return new WaitForEndOfFrame();
+
+            bool initializationSuccessful = false;
+
+            // 1. 基本コンポーネントの作成・初期化
+            try
+            {
+                CreateParentObjects();
+                InitializeComponents();
+                Debug.Log("StageManager: Basic components initialized");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"StageManager: Failed to initialize basic components - {e.Message}");
+                isInitializing = false;
+                yield break;
+            }
+
+            // 2. GameManagerの準備を待つ
+            yield return new WaitUntil(() => GameManager.Instance != null);
+            Debug.Log("StageManager: GameManager ready");
+
+            // 3. 現在のステージをロード
+            try
+            {
+                LoadCurrentStage();
+                initializationSuccessful = true;
+                Debug.Log("StageManager: Stage loading initiated");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"StageManager: Failed to load stage - {e.Message}");
+                initializationSuccessful = false;
+            }
+
+            // 4. 初期化完了処理
+            if (initializationSuccessful)
+            {
+                sceneInitialized = true;
+                Debug.Log("StageManager: Initialization completed successfully");
+            }
+            else
+            {
+                Debug.LogError("StageManager: Initialization failed");
+                sceneInitialized = false;
+            }
+
+            isInitializing = false;
+        }
+
+        /// <summary>
+        /// 外部からの強制再初期化メソッド
+        /// </summary>
+        public void ForceReinitialize()
+        {
+            Debug.Log("StageManager: Force reinitialization requested");
+
+            // 現在のステージをクリア
+            ClearStage();
+
+            // 初期化状態をリセット
+            sceneInitialized = false;
+            isInitializing = false;
+
+            // 再初期化を開始
+            StartCoroutine(InitializeStageManager());
+        }
+
+        /// <summary>
+        /// シーン読み込み完了時に呼び出されるメソッド
+        /// </summary>
+        public void OnSceneLoaded()
+        {
+            Debug.Log("StageManager: Scene loaded notification received");
+
+            if (!sceneInitialized && !isInitializing)
+            {
+                StartCoroutine(InitializeStageManager());
+            }
         }
 
         private void CreateParentObjects()
@@ -128,6 +322,8 @@ namespace GravityFlipLab.Stage
                 environmentalParent = new GameObject("Environmental").transform;
                 environmentalParent.SetParent(transform);
             }
+
+            Debug.Log("StageManager: Parent objects created/verified");
         }
 
         private void InitializeComponents()
@@ -146,26 +342,43 @@ namespace GravityFlipLab.Stage
 
             if (foregroundCollider == null)
                 foregroundCollider = GetComponentInChildren<TilemapCollider2D>();
+
+            Debug.Log("StageManager: Components initialized");
         }
 
         public void LoadStage(StageDataSO stageData)
         {
-            if (stageData == null) return;
+            if (stageData == null)
+            {
+                Debug.LogError("StageManager: Cannot load null stage data");
+                return;
+            }
 
+            Debug.Log($"StageManager: Loading stage data: {stageData.name}");
             currentStageData = stageData;
             StartCoroutine(LoadStageCoroutine());
         }
 
         public void LoadCurrentStage()
         {
+            Debug.Log("StageManager: LoadCurrentStage called");
+
             if (currentStageData != null)
             {
+                Debug.Log($"StageManager: Loading existing stage data: {currentStageData.name}");
                 LoadStage(currentStageData);
+            }
+            else if (GameManager.Instance != null)
+            {
+                // GameManagerから現在のステージ情報を取得
+                Debug.Log($"StageManager: Loading stage from GameManager: World {GameManager.Instance.currentWorld}, Stage {GameManager.Instance.currentStage}");
+                LoadStageByNumber(GameManager.Instance.currentWorld, GameManager.Instance.currentStage);
             }
             else
             {
-                // Try to load stage based on GameManager's current stage
-                LoadStageByNumber(GameManager.Instance.currentWorld, GameManager.Instance.currentStage);
+                Debug.LogWarning("StageManager: No stage data available and GameManager is null");
+                // デフォルトステージをロード
+                LoadStageByNumber(1, 1);
             }
         }
 
@@ -176,16 +389,72 @@ namespace GravityFlipLab.Stage
 
             if (stageData != null)
             {
+                Debug.Log($"StageManager: Loaded stage data from resources: {resourcePath}");
                 LoadStage(stageData);
             }
             else
             {
-                Debug.LogError($"Stage data not found: {resourcePath}");
+                Debug.LogError($"StageManager: Stage data not found: {resourcePath}");
+
+                // フォールバック: デフォルトのステージデータを作成
+                CreateDefaultStageData(world, stage);
             }
+        }
+
+        /// <summary>
+        /// デフォルトのステージデータを作成（リソースが見つからない場合のフォールバック）
+        /// </summary>
+        private void CreateDefaultStageData(int world, int stage)
+        {
+            Debug.Log($"StageManager: Creating default stage data for World {world}, Stage {stage}");
+
+            // 基本的なStageDataSOをコードで作成
+            var defaultStageData = ScriptableObject.CreateInstance<StageDataSO>();
+
+            // StageInfo初期化
+            defaultStageData.stageInfo = new StageInfo
+            {
+                worldNumber = world,
+                stageNumber = stage,
+                stageName = $"World {world} - Stage {stage}",
+                timeLimit = 300f,
+                energyChipCount = 3,
+                playerStartPosition = new Vector3(0f, 0f, 0f),
+                goalPosition = new Vector3(50f, 0f, 0f),
+                checkpointPositions = new List<Vector3>(),
+                theme = StageTheme.Tech,
+                stageLength = 4096f,
+                stageHeight = 1024f,
+                segmentCount = 16
+            };
+
+            // 基本的な背景レイヤー設定
+            defaultStageData.backgroundLayers = new BackgroundLayerData[3];
+            for (int i = 0; i < 3; i++)
+            {
+                defaultStageData.backgroundLayers[i] = new BackgroundLayerData
+                {
+                    layerName = $"Background Layer {i}",
+                    parallaxFactor = 0.25f + (i * 0.25f),
+                    tileSize = new Vector2(512, 512),
+                    enableVerticalLoop = false,
+                    tintColor = Color.white
+                };
+            }
+
+            // 空のオブスタクル・コレクティブルリスト
+            defaultStageData.obstacles = new List<ObstacleData>();
+            defaultStageData.collectibles = new List<CollectibleData>();
+            defaultStageData.environmental = new List<EnvironmentalData>();
+
+            currentStageData = defaultStageData;
+            StartCoroutine(LoadStageCoroutine());
         }
 
         private IEnumerator LoadStageCoroutine()
         {
+            Debug.Log("StageManager: Starting stage load coroutine");
+
             // Clear existing stage
             ClearStage();
 
@@ -219,14 +488,21 @@ namespace GravityFlipLab.Stage
 
             stageLoaded = true;
             OnStageLoaded?.Invoke();
+
+            Debug.Log("StageManager: Stage load completed successfully");
         }
 
         // ゴールセットアップメソッド
         private void SetupGoal()
         {
-            if (currentStageData?.stageInfo == null) return;
+            if (currentStageData?.stageInfo == null)
+            {
+                Debug.LogWarning("StageManager: Cannot setup goal - no stage data or stage info");
+                return;
+            }
 
             Vector3 goalPosition = currentStageData.stageInfo.goalPosition;
+            Debug.Log($"StageManager: Setting up goal at position: {goalPosition}");
 
             // ゴールプレハブが設定されている場合
             if (goalPrefab != null)
@@ -242,7 +518,7 @@ namespace GravityFlipLab.Stage
                     goalTrigger.SetGoalPosition(goalPosition);
                 }
 
-                Debug.Log($"Goal created at position: {goalPosition}");
+                Debug.Log($"StageManager: Goal created from prefab at position: {goalPosition}");
             }
             else
             {
@@ -254,19 +530,20 @@ namespace GravityFlipLab.Stage
         // デフォルトゴール作成メソッド
         private void CreateDefaultGoal(Vector3 position)
         {
+            Debug.Log($"StageManager: Creating default goal at position: {position}");
+
             currentGoal = new GameObject("StageGoal");
             currentGoal.transform.position = position;
 
             // ビジュアルコンポーネントの追加
             SpriteRenderer renderer = currentGoal.AddComponent<SpriteRenderer>();
             renderer.color = Color.yellow;
-            // 基本的な四角形スプライトを設定（実際の開発ではゴール用スプライトを使用）
             renderer.sprite = CreateDefaultGoalSprite();
 
             // コライダーの追加
             BoxCollider2D collider = currentGoal.AddComponent<BoxCollider2D>();
             collider.isTrigger = true;
-            collider.size = new Vector2(2f, 3f); // プレイヤーより大きめに設定
+            collider.size = new Vector2(2f, 3f);
 
             // ライトエフェクトの追加
             Light goalLight = currentGoal.AddComponent<Light>();
@@ -281,15 +558,20 @@ namespace GravityFlipLab.Stage
             goalTrigger.goalLight = goalLight;
             goalTrigger.SetGoalPosition(position);
 
-            Debug.Log($"Default goal created at position: {position}");
+            Debug.Log($"StageManager: Default goal created successfully at position: {position}");
         }
 
         // プレイヤーセットアップメソッド
         private void SetupPlayer()
         {
-            if (currentStageData?.stageInfo == null) return;
+            if (currentStageData?.stageInfo == null)
+            {
+                Debug.LogWarning("StageManager: Cannot setup player - no stage data or stage info");
+                return;
+            }
 
             Vector3 playerStartPosition = currentStageData.stageInfo.playerStartPosition;
+            Debug.Log($"StageManager: Setting up player at position: {playerStartPosition}");
 
             // 既存のプレイヤーがあれば削除
             if (currentPlayer != null)
@@ -311,14 +593,12 @@ namespace GravityFlipLab.Stage
                 currentPlayer = Instantiate(playerPrefab);
                 currentPlayer.transform.position = playerStartPosition;
                 currentPlayer.name = "Player";
-
-                // タグを確実に設定
                 currentPlayer.tag = "Player";
 
                 // プレイヤーコンポーネントの初期化
                 InitializePlayerComponents(currentPlayer);
 
-                Debug.Log($"Player created at position: {playerStartPosition}");
+                Debug.Log($"StageManager: Player created from prefab at position: {playerStartPosition}");
             }
             else
             {
@@ -326,6 +606,7 @@ namespace GravityFlipLab.Stage
                 CreateDefaultPlayer(playerStartPosition);
             }
         }
+
         /// <summary>
         /// プレイヤーコンポーネントの適切な初期化
         /// </summary>
@@ -333,11 +614,13 @@ namespace GravityFlipLab.Stage
         {
             if (player == null) return;
 
+            Debug.Log("StageManager: Initializing player components");
+
             // PlayerControllerの取得
             var playerController = player.GetComponent<PlayerController>();
             if (playerController == null)
             {
-                Debug.LogWarning("Player prefab does not have PlayerController component");
+                Debug.LogWarning("StageManager: Player prefab does not have PlayerController component");
                 return;
             }
 
@@ -367,6 +650,7 @@ namespace GravityFlipLab.Stage
             // その他のコンポーネントの検証
             ValidatePlayerComponents(player);
         }
+
         /// <summary>
         /// プレイヤーコンポーネントの検証
         /// </summary>
@@ -384,7 +668,7 @@ namespace GravityFlipLab.Stage
             {
                 if (player.GetComponent(componentType) == null)
                 {
-                    Debug.LogWarning($"Player is missing required component: {componentType.Name}");
+                    Debug.LogWarning($"StageManager: Player is missing required component: {componentType.Name}");
                 }
             }
 
@@ -394,7 +678,7 @@ namespace GravityFlipLab.Stage
             {
                 if (!playerMovement.ValidateComponentState())
                 {
-                    Debug.LogWarning("PlayerMovement component validation failed, attempting to fix...");
+                    Debug.LogWarning("StageManager: PlayerMovement component validation failed, attempting to fix...");
                     var playerController = player.GetComponent<PlayerController>();
                     if (playerController != null)
                     {
@@ -404,10 +688,11 @@ namespace GravityFlipLab.Stage
             }
         }
 
-
         // デフォルトプレイヤー作成メソッド
         private void CreateDefaultPlayer(Vector3 position)
         {
+            Debug.Log($"StageManager: Creating default player at position: {position}");
+
             currentPlayer = new GameObject("Player");
             currentPlayer.transform.position = position;
             currentPlayer.tag = "Player";
@@ -441,7 +726,7 @@ namespace GravityFlipLab.Stage
             // コンポーネントの初期化
             InitializePlayerComponents(currentPlayer);
 
-            Debug.Log($"Default player created and initialized at position: {position}");
+            Debug.Log($"StageManager: Default player created and initialized at position: {position}");
         }
 
         // デフォルトプレイヤースプライト作成
@@ -481,7 +766,13 @@ namespace GravityFlipLab.Stage
 
         private IEnumerator SetupBackground()
         {
-            if (parallaxManager == null || currentStageData.backgroundLayers == null) yield break;
+            if (parallaxManager == null || currentStageData.backgroundLayers == null)
+            {
+                Debug.Log("StageManager: Skipping background setup - parallax manager or background layers not available");
+                yield break;
+            }
+
+            Debug.Log("StageManager: Setting up background layers");
 
             // Configure parallax layers based on stage data
             for (int i = 0; i < currentStageData.backgroundLayers.Length && i < parallaxManager.parallaxLayers.Length; i++)
@@ -505,6 +796,8 @@ namespace GravityFlipLab.Stage
 
                 yield return null;
             }
+
+            Debug.Log("StageManager: Background setup completed");
         }
 
         private void SetupCamera()
@@ -518,11 +811,15 @@ namespace GravityFlipLab.Stage
                     currentStageData.stageInfo.stageHeight * 0.5f, // Top boundary
                     -currentStageData.stageInfo.stageHeight * 0.5f // Bottom boundary
                 );
+
+                Debug.Log("StageManager: Camera boundaries set");
             }
         }
 
         private IEnumerator LoadObstacles()
         {
+            Debug.Log($"StageManager: Loading {currentStageData.obstacles.Count} obstacles");
+
             foreach (var obstacleData in currentStageData.obstacles)
             {
                 GameObject prefab = GetObstaclePrefab(obstacleData.type);
@@ -548,6 +845,8 @@ namespace GravityFlipLab.Stage
         {
             collectiblesRemaining = 0;
 
+            Debug.Log($"StageManager: Loading {currentStageData.collectibles.Count} collectibles");
+
             foreach (var collectibleData in currentStageData.collectibles)
             {
                 GameObject prefab = GetCollectiblePrefab(collectibleData.type);
@@ -570,6 +869,8 @@ namespace GravityFlipLab.Stage
 
         private IEnumerator LoadEnvironmental()
         {
+            Debug.Log($"StageManager: Loading {currentStageData.environmental.Count} environmental objects");
+
             foreach (var envData in currentStageData.environmental)
             {
                 GameObject prefab = GetEnvironmentalPrefab(envData.type);
@@ -619,7 +920,7 @@ namespace GravityFlipLab.Stage
                 obstacle.StartObstacle();
             }
 
-            Debug.Log($"Stage initialized with {(useEnhancedCheckpointSystem ? "enhanced" : "basic")} checkpoint system");
+            Debug.Log($"StageManager: Stage initialized with {(useEnhancedCheckpointSystem ? "enhanced" : "basic")} checkpoint system");
         }
 
         // Enhanced checkpoint setup method
@@ -651,7 +952,7 @@ namespace GravityFlipLab.Stage
                     CreateEnhancedCheckpoint(checkpointPos);
                 }
 
-                Debug.Log($"Setup {currentStageData.stageInfo.checkpointPositions.Count} enhanced checkpoints from stage data");
+                Debug.Log($"StageManager: Setup {currentStageData.stageInfo.checkpointPositions.Count} enhanced checkpoints from stage data");
             }
             else
             {
@@ -813,7 +1114,7 @@ namespace GravityFlipLab.Stage
                 CreateEnhancedCheckpoint(checkpointPos);
             }
 
-            Debug.Log($"Auto-generated {checkpointCount} checkpoints");
+            Debug.Log($"StageManager: Auto-generated {checkpointCount} checkpoints");
         }
 
         private float FindGroundLevel(float xPosition)
@@ -832,6 +1133,8 @@ namespace GravityFlipLab.Stage
 
         public void ClearStage()
         {
+            Debug.Log("StageManager: Clearing existing stage");
+
             // Clear obstacles
             foreach (var obstacle in activeObstacles)
             {
@@ -879,6 +1182,7 @@ namespace GravityFlipLab.Stage
             activeSegments.Clear();
 
             stageLoaded = false;
+            Debug.Log("StageManager: Stage cleared successfully");
         }
 
         public void CollectibleCollected(Collectible collectible)
@@ -1010,7 +1314,7 @@ namespace GravityFlipLab.Stage
                 CheckpointManager.Instance.ResetToDefaultCheckpoint();
             }
 
-            Debug.Log($"Reset {checkpoints.Length} checkpoints");
+            Debug.Log($"StageManager: Reset {checkpoints.Length} checkpoints");
         }
 
         public float GetCheckpointCompletionPercentage()
@@ -1035,14 +1339,14 @@ namespace GravityFlipLab.Stage
                 // Check if checkpoint position is accessible
                 if (!IsPositionAccessible(checkpointPos))
                 {
-                    Debug.LogWarning($"Checkpoint at {checkpointPos} may not be accessible");
+                    Debug.LogWarning($"StageManager: Checkpoint at {checkpointPos} may not be accessible");
                     allValid = false;
                 }
 
                 // Check if checkpoint has ground nearby
                 if (!HasGroundNearby(checkpointPos))
                 {
-                    Debug.LogWarning($"Checkpoint at {checkpointPos} has no ground nearby");
+                    Debug.LogWarning($"StageManager: Checkpoint at {checkpointPos} has no ground nearby");
                     allValid = false;
                 }
             }
@@ -1164,7 +1468,7 @@ namespace GravityFlipLab.Stage
             }
             else
             {
-                Debug.LogWarning("Invalid terrain data, generating basic ground");
+                Debug.LogWarning("StageManager: Invalid terrain data, generating basic ground");
                 tilemapGroundManager.GenerateBasicGround();
             }
 
@@ -1372,7 +1676,7 @@ namespace GravityFlipLab.Stage
             // This can be called by external systems to notify stage manager of player death
             if (useEnhancedCheckpointSystem)
             {
-                Debug.Log("Player death notification received - enhanced respawn system will handle");
+                Debug.Log("StageManager: Player death notification received - enhanced respawn system will handle");
             }
         }
 
@@ -1381,14 +1685,14 @@ namespace GravityFlipLab.Stage
             // This can be called by external systems to notify stage manager of player respawn
             if (useEnhancedCheckpointSystem)
             {
-                Debug.Log("Player respawn notification received");
+                Debug.Log("StageManager: Player respawn notification received");
             }
         }
 
         public void NotifyCheckpointActivated(Vector3 checkpointPosition)
         {
             // This can be called when a checkpoint is activated
-            Debug.Log($"Checkpoint activated notification: {checkpointPosition}");
+            Debug.Log($"StageManager: Checkpoint activated notification: {checkpointPosition}");
         }
     }
     #endregion

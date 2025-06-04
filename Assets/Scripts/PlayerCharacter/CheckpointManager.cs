@@ -111,7 +111,7 @@ namespace GravityFlipLab.Player
             if (_instance == null)
             {
                 _instance = this;
-                DontDestroyOnLoad(gameObject);
+                //DontDestroyOnLoad(gameObject);
                 InitializeCheckpointSystem();
             }
             else if (_instance != this)

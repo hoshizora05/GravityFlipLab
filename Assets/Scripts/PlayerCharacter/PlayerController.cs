@@ -241,7 +241,7 @@ namespace GravityFlipLab.Player
             }
 
             // Apply assist mode if enabled
-            if (GameManager.Instance != null && GameManager.Instance.playerProgress.settings.assistModeEnabled)
+            if (GameManager.Instance != null && GameManager.Instance.playerProgress != null && GameManager.Instance.playerProgress.settings.assistModeEnabled)
             {
                 stats.livesRemaining += ConfigManager.Instance.assistModeBarrierCount;
             }
