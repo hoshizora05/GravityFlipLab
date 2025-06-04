@@ -7,8 +7,8 @@ using GravityFlipLab.Player;
 namespace GravityFlipLab.Stage
 {
     /// <summary>
-    /// スパイク障害物 - リスポーン統合対応版
-    /// プレイヤーとの接触時に即座にリスポーン処理を実行
+    /// スパイク障害物 - RespawnEnabledObstacle継承版
+    /// 統合リスポーン機能を持つベースクラスから継承し、スパイク固有の機能を実装
     /// </summary>
     public class SpikeObstacle : RespawnEnabledObstacle
     {
@@ -18,29 +18,36 @@ namespace GravityFlipLab.Stage
         public bool retractable = false;
         public float retractDelay = 2f;
 
+        [Header("Spike Visual")]
+        public bool animateOnContact = true;
+        public float spikeAnimationSpeed = 2f;
 
+        // スパイク固有の状態
         private bool isExtended = true;
         private Coroutine retractCoroutine;
-        private float lastContactTime = -1f;
-        private SpriteRenderer spriteRenderer;
-        private Color originalColor;
+        private Coroutine spikeAnimationCoroutine;
+
+        // 初期化フラグ
+        private bool spikeInitialized = false;
 
         public override void StartObstacle()
         {
             base.StartObstacle();
-            InitializeSpike();
+
+            if (!spikeInitialized)
+            {
+                InitializeSpikeSpecific();
+            }
         }
 
-        private void InitializeSpike()
+        /// <summary>
+        /// スパイク固有の初期化
+        /// </summary>
+        private void InitializeSpikeSpecific()
         {
-            // スプライトレンダラーの取得
-            spriteRenderer = GetComponent<SpriteRenderer>();
-            if (spriteRenderer != null)
-            {
-                originalColor = spriteRenderer.color;
-            }
+            if (spikeInitialized) return;
 
-            // コライダーがない場合は追加
+            // コライダーの設定（ベースクラスで基本設定済み、スパイク固有の調整）
             Collider2D collider = GetComponent<Collider2D>();
             if (collider == null)
             {
@@ -50,18 +57,22 @@ namespace GravityFlipLab.Stage
             }
             else
             {
-                collider.isTrigger = true;
+                // 既存のコライダーをスパイクサイズに調整
+                if (collider is BoxCollider2D boxCollider)
+                {
+                    Vector2 size = boxCollider.size;
+                    size.y = spikeHeight;
+                    boxCollider.size = size;
+                }
             }
 
-            // 危険地帯として設定
-            if (gameObject.layer == 0) // Default layer
-            {
-                gameObject.layer = LayerMask.NameToLayer("Obstacles");
-            }
+            spikeInitialized = true;
         }
 
         protected override void OnObstacleStart()
         {
+            base.OnObstacleStart();
+
             if (retractable)
             {
                 StartRetractCycle();
@@ -70,20 +81,150 @@ namespace GravityFlipLab.Stage
 
         protected override void OnObstacleStop()
         {
+            base.OnObstacleStop();
+
             if (retractCoroutine != null)
             {
                 StopCoroutine(retractCoroutine);
                 retractCoroutine = null;
             }
+
+            if (spikeAnimationCoroutine != null)
+            {
+                StopCoroutine(spikeAnimationCoroutine);
+                spikeAnimationCoroutine = null;
+            }
         }
 
+        // Unity衝突イベントをベースクラスに委譲
+        private void OnTriggerEnter2D(Collider2D other)
+        {
+            // スパイクが格納されている場合は接触判定しない
+            if (!isExtended) return;
+
+            // ベースクラスの統合接触処理を使用
+            HandlePlayerContact(other);
+        }
+
+        private void OnCollisionEnter2D(Collision2D collision)
+        {
+            // スパイクが格納されている場合は接触判定しない
+            if (!isExtended) return;
+
+            // ベースクラスの統合接触処理を使用
+            HandlePlayerContact(collision.collider);
+        }
+
+        /// <summary>
+        /// プレイヤー接触検出時の処理（ベースクラスからの呼び出し）
+        /// </summary>
+        protected override void OnPlayerContactDetected(GameObject player, PlayerController playerController)
+        {
+            // スパイク固有の接触処理
+            if (animateOnContact)
+            {
+                PlaySpikeContactAnimation();
+            }
+
+            if (logContactEvents)
+                Debug.Log($"SpikeObstacle: Player contacted spike at {transform.position}, extended: {isExtended}");
+        }
+
+        /// <summary>
+        /// リスポーンがトリガーされた時の処理
+        /// </summary>
+        protected override void OnRespawnTriggered(GameObject player)
+        {
+            // スパイク接触でリスポーンした時の処理
+            if (logContactEvents)
+                Debug.Log($"SpikeObstacle: Player respawn triggered by spike at {transform.position}");
+        }
+
+        /// <summary>
+        /// 従来のダメージシステムが使用された時の処理
+        /// </summary>
+        protected override void OnTraditionalDamageDealt(GameObject player, PlayerController playerController)
+        {
+            // 従来システムでダメージを与えた時の処理
+            if (logContactEvents)
+                Debug.Log($"SpikeObstacle: Traditional damage dealt by spike at {transform.position}");
+        }
+
+        /// <summary>
+        /// スパイク固有の接触エフェクト
+        /// </summary>
+        protected override void PlayCustomContactEffect()
+        {
+            // スパイク固有のエフェクト処理
+            if (animateOnContact)
+            {
+                PlaySpikeContactAnimation();
+            }
+        }
+
+        /// <summary>
+        /// スパイク接触時のアニメーション
+        /// </summary>
+        private void PlaySpikeContactAnimation()
+        {
+            if (spikeAnimationCoroutine != null)
+            {
+                StopCoroutine(spikeAnimationCoroutine);
+            }
+
+            spikeAnimationCoroutine = StartCoroutine(SpikeContactAnimationCoroutine());
+        }
+
+        /// <summary>
+        /// スパイク接触アニメーションのコルーチン
+        /// </summary>
+        private IEnumerator SpikeContactAnimationCoroutine()
+        {
+            Vector3 originalScale = transform.localScale;
+            Vector3 targetScale = originalScale * 1.2f; // 20%拡大
+
+            float duration = 1f / spikeAnimationSpeed;
+            float elapsedTime = 0f;
+
+            // 拡大フェーズ
+            while (elapsedTime < duration * 0.3f)
+            {
+                float t = elapsedTime / (duration * 0.3f);
+                transform.localScale = Vector3.Lerp(originalScale, targetScale, t);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+
+            // 縮小フェーズ
+            elapsedTime = 0f;
+            while (elapsedTime < duration * 0.7f)
+            {
+                float t = elapsedTime / (duration * 0.7f);
+                transform.localScale = Vector3.Lerp(targetScale, originalScale, t);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+
+            transform.localScale = originalScale;
+            spikeAnimationCoroutine = null;
+        }
+
+        #region Retractable Spike Logic
+
+        /// <summary>
+        /// 格納可能スパイクのサイクル開始
+        /// </summary>
         private void StartRetractCycle()
         {
             if (retractCoroutine != null)
                 StopCoroutine(retractCoroutine);
+
             retractCoroutine = StartCoroutine(RetractCycle());
         }
 
+        /// <summary>
+        /// 格納サイクルのコルーチン
+        /// </summary>
         private IEnumerator RetractCycle()
         {
             while (isActive)
@@ -95,12 +236,18 @@ namespace GravityFlipLab.Stage
             }
         }
 
+        /// <summary>
+        /// スパイクの展開/格納を切り替え
+        /// </summary>
         private void ToggleSpikes()
         {
             isExtended = !isExtended;
             StartCoroutine(AnimateSpikes());
         }
 
+        /// <summary>
+        /// スパイクの展開/格納アニメーション
+        /// </summary>
         private IEnumerator AnimateSpikes()
         {
             float startScale = transform.localScale.y;
@@ -124,129 +271,9 @@ namespace GravityFlipLab.Stage
             transform.localScale = finalScale;
         }
 
-        private void OnTriggerEnter2D(Collider2D other)
-        {
-            HandleContact(other);
-        }
+        #endregion
 
-        private void OnCollisionEnter2D(Collision2D collision)
-        {
-            HandleContact(collision.collider);
-        }
-
-        /// <summary>
-        /// プレイヤーとの接触処理
-        /// </summary>
-        private void HandleContact(Collider2D other)
-        {
-            // スパイクが格納されている場合はダメージなし
-            if (!isExtended) return;
-
-            // プレイヤーかどうかチェック
-            if (!other.CompareTag("Player")) return;
-
-            // 接触クールダウンチェック
-            if (Time.time - lastContactTime < contactCooldown) return;
-
-            // 対象の有効性チェック
-            if (!IsTargetValid(other.gameObject)) return;
-
-            // プレイヤーコンポーネントの取得
-            var playerController = other.GetComponent<PlayerController>();
-            if (playerController == null) return;
-
-            // 無敵状態のチェック（バイパスオプション考慮）
-            if (!bypassInvulnerability && playerController.stats.isInvincible)
-            {
-                return;
-            }
-
-            lastContactTime = Time.time;
-
-            // 接触処理実行
-            ExecutePlayerContact(other.gameObject, playerController);
-        }
-
-        /// <summary>
-        /// プレイヤー接触時の処理実行
-        /// </summary>
-        private void ExecutePlayerContact(GameObject player, PlayerController playerController)
-        {
-            // ビジュアルエフェクト
-            if (enableContactEffect)
-            {
-                StartCoroutine(ContactFlashEffect());
-            }
-
-            // 障害物トリガーイベント
-            TriggerObstacle();
-
-            if (useIntegratedRespawn)
-            {
-                // 統合リスポーンシステムを使用
-                HandleIntegratedRespawn(player);
-            }
-            else
-            {
-                // 従来のダメージシステムを使用
-                HandleTraditionalDamage(player, playerController);
-            }
-        }
-
-        /// <summary>
-        /// 統合リスポーンシステムによる処理
-        /// </summary>
-        private void HandleIntegratedRespawn(GameObject player)
-        {
-            var respawnIntegration = player.GetComponent<RespawnIntegration>();
-            if (respawnIntegration != null)
-            {
-                // 即座にリスポーンを実行
-                respawnIntegration.TriggerInstantRespawn();
-
-                if (Debug.isDebugBuild)
-                    Debug.Log($"SpikeObstacle: Triggered instant respawn for player at {transform.position}");
-            }
-            else
-            {
-                Debug.LogWarning($"SpikeObstacle: RespawnIntegration component not found on player. Using fallback damage system.");
-
-                // フォールバック: 従来のダメージシステム
-                var playerController = player.GetComponent<PlayerController>();
-                if (playerController != null)
-                {
-                    HandleTraditionalDamage(player, playerController);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 従来のダメージシステム（フォールバック用）
-        /// </summary>
-        private void HandleTraditionalDamage(GameObject player, PlayerController playerController)
-        {
-            // 既存のダメージ処理
-            DealDamage(player);
-
-            if (Debug.isDebugBuild)
-                Debug.Log($"SpikeObstacle: Dealt damage to player at {transform.position}");
-        }
-
-        /// <summary>
-        /// 接触時のフラッシュエフェクト
-        /// </summary>
-        private IEnumerator ContactFlashEffect()
-        {
-            if (spriteRenderer == null) yield break;
-
-            // 危険色に変更
-            spriteRenderer.color = dangerColor;
-
-            yield return new WaitForSeconds(flashDuration);
-
-            // 元の色に戻す
-            spriteRenderer.color = originalColor;
-        }
+        #region Public API
 
         /// <summary>
         /// スパイクの設定変更
@@ -269,41 +296,73 @@ namespace GravityFlipLab.Stage
         }
 
         /// <summary>
-        /// リスポーン統合設定の変更
-        /// </summary>
-        public void SetRespawnIntegration(bool useIntegrated, bool bypassInvuln, float cooldown)
-        {
-            useIntegratedRespawn = useIntegrated;
-            bypassInvulnerability = bypassInvuln;
-            contactCooldown = cooldown;
-        }
-
-        /// <summary>
         /// 手動でスパイクを作動させる
         /// </summary>
         public void ManualTrigger()
         {
-            if (!isActive) return;
+            if (!isActive || !isExtended) return;
 
-            // 範囲内のプレイヤーを検索
-            Collider2D[] colliders = Physics2D.OverlapBoxAll(
-                transform.position,
-                GetComponent<Collider2D>().bounds.size,
-                0f,
-                LayerMask.GetMask("Player")
-            );
+            // ベースクラスの手動トリガー機能を使用
+            TriggerManualHazardCheck();
+        }
 
-            foreach (var collider in colliders)
+        /// <summary>
+        /// スパイクを強制的に展開
+        /// </summary>
+        public void ForceExtend()
+        {
+            if (retractCoroutine != null)
             {
-                if (collider.CompareTag("Player"))
-                {
-                    HandleContact(collider);
-                    break; // 一人のプレイヤーのみ処理
-                }
+                StopCoroutine(retractCoroutine);
+                retractCoroutine = null;
+            }
+
+            isExtended = true;
+            transform.localScale = new Vector3(transform.localScale.x, 1f, transform.localScale.z);
+        }
+
+        /// <summary>
+        /// スパイクを強制的に格納
+        /// </summary>
+        public void ForceRetract()
+        {
+            if (retractCoroutine != null)
+            {
+                StopCoroutine(retractCoroutine);
+                retractCoroutine = null;
+            }
+
+            isExtended = false;
+            transform.localScale = new Vector3(transform.localScale.x, 0.1f, transform.localScale.z);
+        }
+
+        /// <summary>
+        /// スパイクの高さを設定
+        /// </summary>
+        public void SetSpikeHeight(float height)
+        {
+            spikeHeight = Mathf.Max(0.1f, height);
+
+            // コライダーサイズも更新
+            Collider2D collider = GetComponent<Collider2D>();
+            if (collider is BoxCollider2D boxCollider)
+            {
+                Vector2 size = boxCollider.size;
+                size.y = spikeHeight;
+                boxCollider.size = size;
             }
         }
 
-        // デバッグ用の可視化
+        // プロパティ
+        public bool IsExtended => isExtended;
+        public bool IsRetractable => retractable;
+        public float SpikeHeight => spikeHeight;
+        public bool PointsUp => pointsUp;
+
+        #endregion
+
+        #region Debug and Visualization
+
         protected override void OnDrawGizmos()
         {
             base.OnDrawGizmos();
@@ -325,19 +384,16 @@ namespace GravityFlipLab.Stage
             Gizmos.DrawWireCube(transform.position, size);
 
             // スパイクの向きを表示
-            if (pointsUp)
-            {
-                Gizmos.DrawLine(transform.position, transform.position + Vector3.up * spikeHeight);
-            }
-            else
-            {
-                Gizmos.DrawLine(transform.position, transform.position + Vector3.down * spikeHeight);
-            }
+            Vector3 spikeDirection = pointsUp ? Vector3.up : Vector3.down;
+            Gizmos.DrawLine(transform.position, transform.position + spikeDirection * spikeHeight);
+            Gizmos.DrawWireSphere(transform.position + spikeDirection * spikeHeight, 0.1f);
         }
 
         protected override void OnDrawGizmosSelected()
         {
-            // 詳細情報の表示
+            base.OnDrawGizmosSelected();
+
+            // スパイク固有の詳細情報
             Gizmos.color = Color.cyan;
 
             // 接触範囲の表示
@@ -347,64 +403,111 @@ namespace GravityFlipLab.Stage
                 Gizmos.DrawWireCube(bounds.center, bounds.size * 1.2f);
             }
 
-            // 最後の接触時間の可視化
-            if (Application.isPlaying && lastContactTime > 0 && Time.time - lastContactTime < 2f)
+            // 格納可能スパイクの範囲表示
+            if (retractable)
             {
-                Gizmos.color = Color.red;
-                Gizmos.DrawSphere(transform.position + Vector3.up * 2f, 0.3f);
+                Gizmos.color = Color.magenta;
+                Gizmos.DrawWireCube(transform.position, Vector3.one * retractDelay * 0.5f);
             }
+
+            // スパイクの高さ表示
+            Gizmos.color = Color.white;
+            Vector3 heightStart = transform.position + Vector3.left * 0.7f;
+            Vector3 heightEnd = heightStart + (pointsUp ? Vector3.up : Vector3.down) * spikeHeight;
+            Gizmos.DrawLine(heightStart, heightEnd);
+
+            // 高さの数値表示用の球
+            Gizmos.DrawWireSphere(heightEnd, 0.05f);
         }
 
-        // エディター用の設定検証
+        #endregion
+
+        #region Validation and Configuration
+
         protected override void OnValidate()
         {
+            base.OnValidate();
+
+            // スパイク固有の検証
             if (spikeHeight <= 0f)
                 spikeHeight = 1f;
 
             if (retractDelay <= 0f)
                 retractDelay = 2f;
 
-            if (contactCooldown < 0f)
-                contactCooldown = 0f;
-
-            if (flashDuration <= 0f)
-                flashDuration = 0.1f;
+            if (spikeAnimationSpeed <= 0f)
+                spikeAnimationSpeed = 2f;
         }
 
-        // パブリック API
-        public bool IsExtended => isExtended;
-        public bool IsRetractable => retractable;
-
-        public void SetDangerColor(Color color)
+        /// <summary>
+        /// スパイク設定の検証
+        /// </summary>
+        public bool ValidateSpikeConfiguration()
         {
-            dangerColor = color;
+            bool isValid = true;
+            List<string> errors = new List<string>();
+
+            if (spikeHeight <= 0f)
+            {
+                errors.Add("Spike height must be greater than 0");
+                isValid = false;
+            }
+
+            if (retractable && retractDelay <= 0f)
+            {
+                errors.Add("Retract delay must be greater than 0 for retractable spikes");
+                isValid = false;
+            }
+
+            if (GetComponent<Collider2D>() == null)
+            {
+                errors.Add("Spike obstacle requires a Collider2D component");
+                isValid = false;
+            }
+
+            if (!isValid)
+            {
+                Debug.LogError($"SpikeObstacle validation failed on {gameObject.name}: {string.Join(", ", errors)}");
+            }
+
+            return isValid;
         }
 
-        public void SetContactCooldown(float cooldown)
+        /// <summary>
+        /// 実行時設定の更新
+        /// </summary>
+        public void UpdateSpikeSettings(bool useIntegratedRespawn, bool bypassInvulnerability,
+                                       float contactCooldown, bool enableEffect, float animSpeed)
         {
-            contactCooldown = Mathf.Max(0f, cooldown);
+            // ベースクラスの設定更新
+            SetRespawnConfiguration(useIntegratedRespawn, bypassInvulnerability, contactCooldown);
+            SetContactEffectConfiguration(enableEffect, dangerColor, flashDuration);
+
+            // スパイク固有の設定更新
+            animateOnContact = enableEffect;
+            spikeAnimationSpeed = animSpeed;
         }
 
-        public void ForceExtend()
+        #endregion
+
+        #region Cleanup
+
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
+
+            // スパイク固有のコルーチンクリーンアップ
             if (retractCoroutine != null)
             {
                 StopCoroutine(retractCoroutine);
-                retractCoroutine = null;
             }
-            isExtended = true;
-            transform.localScale = new Vector3(transform.localScale.x, 1f, transform.localScale.z);
+
+            if (spikeAnimationCoroutine != null)
+            {
+                StopCoroutine(spikeAnimationCoroutine);
+            }
         }
 
-        public void ForceRetract()
-        {
-            if (retractCoroutine != null)
-            {
-                StopCoroutine(retractCoroutine);
-                retractCoroutine = null;
-            }
-            isExtended = false;
-            transform.localScale = new Vector3(transform.localScale.x, 0.1f, transform.localScale.z);
-        }
+        #endregion
     }
 }

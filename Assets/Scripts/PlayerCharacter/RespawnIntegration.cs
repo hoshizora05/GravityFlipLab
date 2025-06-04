@@ -311,24 +311,20 @@ namespace GravityFlipLab.Player
         /// </summary>
         private void ResetGravityState()
         {
-            // GravitySystemをデフォルト状態にリセット
+            // GravitySystemの新しいResetToOriginalGravityメソッドを使用
             if (GravitySystem.Instance != null)
             {
-                //GravitySystem.Instance.ResetToOriginalGravity();
+                GravitySystem.Instance.ResetToOriginalGravity();
             }
 
-            // GravityAffectedObjectをリセット
+            // GravityAffectedObjectの重力リセット
             if (gravityAffected != null)
             {
                 gravityAffected.ResetToOriginalGravity();
             }
 
-            // プレイヤーの重力方向をリセット
-            if (playerController != null)
-            {
-                // gravityDirectionはprivateなので、イベントを通じてリセット
-                // 実際の実装では、PlayerControllerにリセットメソッドを追加することを推奨
-            }
+            if (logRespawnEvents)
+                Debug.Log("RespawnIntegration: Gravity state reset completed");
         }
 
         /// <summary>
@@ -430,8 +426,39 @@ namespace GravityFlipLab.Player
             // 緊急時はコンポーネントを完全に再初期化
             InitializeComponents();
 
+            // 緊急時の重力リセット
+            EmergencyGravityReset();
+
             // 強制的にリスポーン
             StartCoroutine(RespawnSequence());
+        }
+
+        /// <summary>
+        /// 緊急時の重力リセット
+        /// </summary>
+        private void EmergencyGravityReset()
+        {
+            try
+            {
+                // GravitySystemの強制リセット
+                if (GravitySystem.Instance != null)
+                {
+                    GravitySystem.Instance.ForceResetToOriginalGravity();
+                }
+
+                // GravityAffectedObjectの強制リセット
+                if (gravityAffected != null)
+                {
+                    gravityAffected.ForceResetToOriginalGravity();
+                }
+
+                if (logRespawnEvents)
+                    Debug.Log("RespawnIntegration: Emergency gravity reset completed");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"RespawnIntegration: Emergency gravity reset failed - {e.Message}");
+            }
         }
 
         /// <summary>
