@@ -132,13 +132,22 @@ namespace GravityFlipLab.Player
         {
             if (movementSettings.useGravityAffectedObject && gravityAffected != null)
             {
-                // GravityAffectedObjectに重力処理を委譲
-                gravityAffected.useCustomGravity = true;
-                gravityAffected.gravityScale = 1f;
-                gravityAffected.maintainInertia = false; // 慣性による減衰を無効化
+                // 既存の設定を保持（変更しない）
+                // gravityAffected.useCustomGravity = true; ← 削除
+                // gravityAffected.gravityScale = 1f; ← 削除
+                // gravityAffected.maintainInertia = false; ← 削除
+
+                // 設定が無効になっている場合のみ修正
+                if (!gravityAffected.useCustomGravity)
+                {
+                    gravityAffected.useCustomGravity = true;
+
+                    if (showDebugInfo)
+                        Debug.Log("PlayerMovement: Re-enabled useCustomGravity");
+                }
 
                 if (showDebugInfo)
-                    Debug.Log("PlayerMovement: Delegating gravity to GravityAffectedObject");
+                    Debug.Log("PlayerMovement: Preserving existing gravity configuration");
             }
             else
             {

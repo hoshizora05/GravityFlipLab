@@ -70,7 +70,11 @@ namespace GravityFlipLab.Player
         public Vector3 defaultCheckpointPosition = Vector3.zero;
         public float respawnDelay = 1.0f;
         public bool preserveVelocityOnRespawn = false;
-        public bool resetGravityOnRespawn = true;
+        public bool resetGravityOnRespawn = false; // デフォルトをfalseに変更
+
+        [Header("Respawn Integration")]
+        public bool useRespawnIntegration = true; // 新機能：RespawnIntegrationとの統合
+        public bool delegateToRespawnIntegration = true; // リスポーン処理を委譲
 
         [Header("Visual Effects")]
         public GameObject checkpointEffect;
@@ -143,7 +147,6 @@ namespace GravityFlipLab.Player
 
         private void SetupInitialCheckpoint()
         {
-            // Set initial checkpoint based on player start position or default
             GameObject player = GameObject.FindGameObjectWithTag("Player");
             Vector3 startPosition = defaultCheckpointPosition;
 
@@ -167,7 +170,6 @@ namespace GravityFlipLab.Player
 
         private void DiscoverAndRegisterCheckpoints()
         {
-            // Find all checkpoint triggers in the scene and register them
             Stage.CheckpointTrigger[] triggers = FindObjectsByType<Stage.CheckpointTrigger>(FindObjectsSortMode.None);
 
             foreach (var trigger in triggers)
@@ -203,19 +205,14 @@ namespace GravityFlipLab.Player
 
         public void SetCheckpoint(Vector3 position, GravityDirection gravity = GravityDirection.Down, bool isDefault = false)
         {
-            // Save previous checkpoint to history
             if (currentCheckpoint != null && !isDefault)
             {
                 checkpointHistory.Add(currentCheckpoint);
             }
 
-            // Create new checkpoint data
             currentCheckpoint = new CheckpointData(position, gravity);
-
-            // Update legacy position for backward compatibility
             currentCheckpointPosition = position;
 
-            // Add stage-specific data
             if (Stage.StageManager.Instance != null)
             {
                 currentCheckpoint.additionalData["stageTime"] = Time.time - Stage.StageManager.Instance.stageStartTime;
@@ -223,15 +220,12 @@ namespace GravityFlipLab.Player
             }
 
             OnCheckpointSet?.Invoke(currentCheckpoint);
-
-            // Play effects
             PlayCheckpointEffect(position);
 
             if (debugMode || logRespawnEvents)
                 Debug.Log($"Checkpoint set at: {position} with gravity: {gravity}");
         }
 
-        // Legacy method for backward compatibility
         public void SetCheckpoint(Vector3 position)
         {
             SetCheckpoint(position, GravityDirection.Down, false);
@@ -271,17 +265,43 @@ namespace GravityFlipLab.Player
             }
         }
 
+        /// <summary>
+        /// プレイヤー死亡時のハンドラー - RespawnIntegrationとの統合考慮
+        /// </summary>
         private void HandlePlayerDeath()
         {
             if (debugMode || logRespawnEvents)
-                Debug.Log("Player death detected, initiating respawn sequence");
+                Debug.Log("CheckpointManager: Player death detected");
 
+            // RespawnIntegrationが存在し、使用する設定の場合は委譲
+            if (useRespawnIntegration && delegateToRespawnIntegration)
+            {
+                GameObject player = GameObject.FindGameObjectWithTag("Player");
+                if (player != null)
+                {
+                    var respawnIntegration = player.GetComponent<RespawnIntegration>();
+                    if (respawnIntegration != null)
+                    {
+                        if (debugMode || logRespawnEvents)
+                            Debug.Log("CheckpointManager: Delegating respawn to RespawnIntegration");
+                        return; // RespawnIntegrationに任せる
+                    }
+
+                    // PlayerControllerに処理中であることを通知
+                    var playerController = player.GetComponent<PlayerController>();
+                    if (playerController != null)
+                    {
+                        playerController.NotifyRespawnHandled();
+                    }
+                }
+            }
+
+            // フォールバック：従来のリスポーン処理
             StartCoroutine(RespawnSequence());
         }
 
         private void HandleGravityFlip(GravityDirection newDirection)
         {
-            // Update current checkpoint's gravity direction if player flips gravity
             if (currentCheckpoint != null)
             {
                 currentCheckpoint.gravityDirection = newDirection;
@@ -293,15 +313,16 @@ namespace GravityFlipLab.Player
             Vector3 respawnPosition = GetCurrentCheckpointPosition();
             OnRespawnStarted?.Invoke(respawnPosition);
 
-            // Wait for respawn delay
             yield return new WaitForSeconds(respawnDelay);
 
-            // Execute respawn
             RespawnPlayer();
 
             OnRespawnCompleted?.Invoke(respawnPosition);
         }
 
+        /// <summary>
+        /// プレイヤーリスポーン処理 - 重力競合問題を修正
+        /// </summary>
         private void RespawnPlayer()
         {
             GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -311,10 +332,10 @@ namespace GravityFlipLab.Player
                 return;
             }
 
-            // Get player components
             var playerController = player.GetComponent<PlayerController>();
             var rigidbody = player.GetComponent<Rigidbody2D>();
             var gravityAffected = player.GetComponent<GravityAffectedObject>();
+            var respawnIntegration = player.GetComponent<RespawnIntegration>();
 
             if (currentCheckpoint == null)
             {
@@ -324,23 +345,21 @@ namespace GravityFlipLab.Player
 
             Vector3 respawnPosition = currentCheckpoint.position;
 
-            // Validate respawn position safety
             if (enableSafetyRespawn)
             {
                 respawnPosition = ValidateAndCorrectRespawnPosition(respawnPosition);
             }
 
-            // Move player to checkpoint position
+            // 位置を移動
             player.transform.position = respawnPosition;
 
-            // Reset physics
+            // 物理状態のリセット
             if (rigidbody != null)
             {
                 if (preserveVelocityOnRespawn)
                 {
-                    // Preserve some velocity for smoother respawn
                     Vector2 velocity = rigidbody.linearVelocity;
-                    velocity.y = 0f; // Reset vertical velocity to prevent fall damage
+                    velocity.y = 0f;
                     rigidbody.linearVelocity = velocity;
                 }
                 else
@@ -350,58 +369,124 @@ namespace GravityFlipLab.Player
                 }
             }
 
-            //// Reset gravity if needed
-            //if (resetGravityOnRespawn && GravitySystem.Instance != null)
-            //{
-            //    if (currentCheckpoint.gravityDirection == GravityDirection.Down)
-            //    {
-            //        GravitySystem.Instance.ResetToOriginalGravity();
-            //    }
-            //    else
-            //    {
-            //        GravitySystem.Instance.SetGlobalGravityDirection(Vector2.up);
-            //    }
-            //}
+            // 重要：重力システムの処理を修正
+            if (useRespawnIntegration && respawnIntegration != null)
+            {
+                // RespawnIntegrationが存在する場合は重力処理を委譲
+                if (debugMode || logRespawnEvents)
+                    Debug.Log("CheckpointManager: Gravity handling delegated to RespawnIntegration");
+            }
+            else
+            {
+                // RespawnIntegrationがない場合のみ従来の重力処理
+                HandleGravityForLegacyMode(gravityAffected);
+            }
 
-            // Reset player controller state
+            // PlayerControllerの状態リセット（重力に影響しない方法）
             if (playerController != null)
             {
-                playerController.Respawn();
+                // 重力設定を保護しながらリセット
+                ResetPlayerControllerSafely(playerController, gravityAffected);
             }
 
-            // Reset gravity affected object
-            if (gravityAffected != null)
-            {
-                gravityAffected.ResetToOriginalGravity();
-            }
-
-            // Reset advanced ground detector
+            // 地面検出の更新
             var groundDetector = player.GetComponent<AdvancedGroundDetector>();
             if (groundDetector != null)
             {
                 groundDetector.ForceDetection();
             }
 
-            // Reset player movement
+            // PlayerMovementの物理状態検証のみ
             var playerMovement = player.GetComponent<PlayerMovement>();
             if (playerMovement != null)
             {
                 playerMovement.ValidatePhysicsState();
             }
 
-            // Play respawn effects
             PlayRespawnEffect(respawnPosition);
-
-            // Restore additional state if needed
             RestoreAdditionalState();
 
             if (debugMode || logRespawnEvents)
-                Debug.Log($"Player respawned at: {respawnPosition}");
+                Debug.Log($"CheckpointManager: Player respawned at: {respawnPosition}");
+        }
+
+        /// <summary>
+        /// RespawnIntegrationがない場合の従来モード重力処理
+        /// </summary>
+        private void HandleGravityForLegacyMode(GravityAffectedObject gravityAffected)
+        {
+            if (!resetGravityOnRespawn) return;
+
+            try
+            {
+                if (GravitySystem.Instance != null)
+                {
+                    if (currentCheckpoint.gravityDirection == GravityDirection.Down)
+                    {
+                        GravitySystem.Instance.ResetToOriginalGravity();
+                    }
+                    else
+                    {
+                        GravitySystem.Instance.SetGlobalGravityDirection(Vector2.up);
+                    }
+                }
+
+                // GravityAffectedObjectのリセット（ResetToOriginalGravityは呼ばない）
+                if (gravityAffected != null)
+                {
+                    // useCustomGravityを保持したまま、必要最小限の設定のみ
+                    gravityAffected.gravityScale = 1f;
+
+                    // useCustomGravityがtrueであることを確認
+                    if (!gravityAffected.useCustomGravity)
+                    {
+                        gravityAffected.useCustomGravity = true;
+                        if (debugMode || logRespawnEvents)
+                            Debug.Log("CheckpointManager: Re-enabled useCustomGravity");
+                    }
+
+                    if (debugMode || logRespawnEvents)
+                        Debug.Log("CheckpointManager: Legacy gravity handling applied (useCustomGravity preserved)");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"CheckpointManager: Legacy gravity handling failed - {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PlayerControllerの安全なリセット（重力設定を保護）
+        /// </summary>
+        private void ResetPlayerControllerSafely(PlayerController playerController, GravityAffectedObject gravityAffected)
+        {
+            // 重力設定を保存
+            bool useCustomGravity = true;
+            float gravityScale = 1f;
+
+            if (gravityAffected != null)
+            {
+                useCustomGravity = gravityAffected.useCustomGravity;
+                gravityScale = gravityAffected.gravityScale;
+            }
+
+            // PlayerControllerのExternalRespawnを呼ぶ（競合回避）
+            Vector3 respawnPosition = currentCheckpoint.position;
+            playerController.ExternalRespawn(respawnPosition);
+
+            // 重力設定を復元
+            if (gravityAffected != null)
+            {
+                gravityAffected.useCustomGravity = useCustomGravity;
+                gravityAffected.gravityScale = gravityScale;
+
+                if (debugMode || logRespawnEvents)
+                    Debug.Log($"CheckpointManager: Gravity settings preserved - useCustom: {useCustomGravity}, scale: {gravityScale}");
+            }
         }
 
         private Vector3 ValidateAndCorrectRespawnPosition(Vector3 originalPosition)
         {
-            // Check if respawn position is safe
             if (IsPositionSafe(originalPosition))
             {
                 return originalPosition;
@@ -410,7 +495,6 @@ namespace GravityFlipLab.Player
             if (debugMode)
                 Debug.LogWarning($"Unsafe respawn position detected: {originalPosition}. Attempting correction.");
 
-            // Try to find a safe position nearby
             Vector3 safePosition = FindSafeRespawnPosition(originalPosition);
 
             if (safePosition != Vector3.zero)
@@ -420,20 +504,17 @@ namespace GravityFlipLab.Player
                 return safePosition;
             }
 
-            // Emergency fallback to default checkpoint
             Debug.LogWarning($"No safe position found, using default checkpoint: {defaultCheckpointPosition}");
             return defaultCheckpointPosition;
         }
 
         private bool IsPositionSafe(Vector3 position)
         {
-            // Check for obstacles
             if (Physics2D.OverlapPoint(position, LayerMask.GetMask("Obstacles", "Hazards")))
             {
                 return false;
             }
 
-            // Check for ground below
             RaycastHit2D groundCheck = Physics2D.Raycast(position, Vector2.down, safetyCheckDistance, LayerMask.GetMask("Ground"));
             return groundCheck.collider != null;
         }
@@ -454,17 +535,13 @@ namespace GravityFlipLab.Player
                 }
             }
 
-            return Vector3.zero; // No safe position found
+            return Vector3.zero;
         }
 
         private void RestoreAdditionalState()
         {
             if (currentCheckpoint?.additionalData == null) return;
 
-            // Restore any additional state stored in checkpoint data
-            // This could include power-ups, special abilities, etc.
-
-            // Example: Restore stage-specific state
             if (currentCheckpoint.additionalData.ContainsKey("specialState"))
             {
                 // Restore special state
@@ -562,6 +639,16 @@ namespace GravityFlipLab.Player
             resetGravityOnRespawn = reset;
         }
 
+        public void SetUseRespawnIntegration(bool use)
+        {
+            useRespawnIntegration = use;
+        }
+
+        public void SetDelegateToRespawnIntegration(bool delegate_)
+        {
+            delegateToRespawnIntegration = delegate_;
+        }
+
         // Immediate respawn methods
         public void ForceRespawn()
         {
@@ -598,37 +685,47 @@ namespace GravityFlipLab.Player
             return stats;
         }
 
+        // Debug用メソッド
+        public void DiagnoseRespawnIntegration()
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                var respawnIntegration = player.GetComponent<RespawnIntegration>();
+                Debug.Log($"CheckpointManager Integration Status:");
+                Debug.Log($"- useRespawnIntegration: {useRespawnIntegration}");
+                Debug.Log($"- delegateToRespawnIntegration: {delegateToRespawnIntegration}");
+                Debug.Log($"- RespawnIntegration component: {(respawnIntegration != null ? "Present" : "Missing")}");
+                Debug.Log($"- resetGravityOnRespawn: {resetGravityOnRespawn}");
+            }
+        }
+
         // Debug and visualization
         private void OnDrawGizmos()
         {
             if (!showCheckpointGizmos) return;
 
-            // Draw current checkpoint
             if (currentCheckpoint != null)
             {
                 Gizmos.color = Color.green;
                 Gizmos.DrawWireSphere(currentCheckpoint.position, 1f);
             }
 
-            // Draw default checkpoint
             Gizmos.color = Color.blue;
             Gizmos.DrawWireCube(defaultCheckpointPosition, Vector3.one * 0.5f);
 
-            // Draw checkpoint history
             Gizmos.color = Color.yellow;
             for (int i = 0; i < checkpointHistory.Count; i++)
             {
                 Vector3 pos = checkpointHistory[i].position;
                 Gizmos.DrawWireSphere(pos, 0.5f);
 
-                // Draw connection line to previous checkpoint
                 if (i > 0)
                 {
                     Gizmos.DrawLine(checkpointHistory[i - 1].position, pos);
                 }
             }
 
-            // Draw connection from last history to current
             if (checkpointHistory.Count > 0 && currentCheckpoint != null)
             {
                 Vector3 lastHistory = checkpointHistory[checkpointHistory.Count - 1].position;
@@ -640,18 +737,15 @@ namespace GravityFlipLab.Player
         {
             if (!debugMode) return;
 
-            // Draw detailed checkpoint information
             foreach (var checkpoint in registeredCheckpoints)
             {
                 if (checkpoint != null)
                 {
                     Vector3 pos = checkpoint.checkpointPosition;
 
-                    // Draw checkpoint area
                     Gizmos.color = checkpoint.IsActivated ? Color.green : Color.gray;
                     Gizmos.DrawWireCube(pos, Vector3.one);
 
-                    // Draw trigger area
                     Gizmos.color = Color.cyan;
                     var collider = checkpoint.GetComponent<Collider2D>();
                     if (collider != null)

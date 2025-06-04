@@ -5187,9 +5187,9 @@ MonoBehaviour:
     baseRunSpeed: 5
     speedVariation: 0.2
     enableSpeedVariation: 1
-    customGravityStrength: 9.81
-    gravityTransitionSpeed: 8
-    useGravitySystemGravity: 1
+    useGravityAffectedObject: 1
+    fallbackGravityStrength: 9.81
+    overrideGravitySystem: 0
     slopeAcceleration: 1.3
     slopeDeceleration: 0.8
     maxSlopeAngle: 50
@@ -5201,7 +5201,6 @@ MonoBehaviour:
     bounceThreshold: 10
     bounceDamping: 0.7
     enableMomentumConservation: 0
-    enablePhysicsIntegration: 1
     velocitySmoothing: 0.02
   groundLayerMask:
     serializedVersion: 2
@@ -5294,9 +5293,16 @@ MonoBehaviour:
   useCustomGravity: 1
   smoothGravityTransition: 1
   transitionSpeed: 5
+  originalGravityDirection: {x: 0, y: -1}
+  originalGravityScale: 1
+  storeOriginalOnStart: 1
+  respondToSystemReset: 1
+  smoothReset: 1
+  resetTransitionSpeed: 8
+  preserveVelocityOnReset: 0
   maintainInertia: 1
-  inertiaDecay: 0.9
-  maxVelocityChange: 20
+  inertiaDecay: 0.99
+  maxVelocityChange: 50
 --- !u!114 &1008834187971518196
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5335,6 +5341,8 @@ MonoBehaviour:
   debugMode: 0
   showTrajectoryPrediction: 0
   trajectoryPoints: 20
+  useIntegratedRespawnSystem: 1
+  fallbackRespawnDelay: 1
 --- !u!114 &185831910818558098
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5392,6 +5400,8 @@ MonoBehaviour:
   invulnerabilityDuration: 1
   maxConsecutiveDeaths: 5
   emergencyRespawnDelay: 2
+  forceGravityValidation: 1
+  gravityValidationDelay: 0.2
 --- !u!1 &4175828736110790596
 GameObject:
   m_ObjectHideFlags: 0

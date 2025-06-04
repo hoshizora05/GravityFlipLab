@@ -73,6 +73,30 @@ namespace GravityFlipLab.Player
         public bool showTrajectoryPrediction = false;
         public int trajectoryPoints = 20;
 
+        [Header("Respawn Coordination")]
+        public bool useIntegratedRespawnSystem = true; // 統合リスポーンシステムを使用
+        public float fallbackRespawnDelay = 1.0f; // フォールバック用のリスポーン遅延
+
+        private bool isRespawnHandled = false; // リスポーン処理が他システムで処理済みかフラグ
+        private Coroutine respawnCoroutine; // リスポーンコルーチンの参照
+
+        // 初期設定値を保存するための構造体
+        [System.Serializable]
+        public struct GravityConfiguration
+        {
+            public bool useCustomGravity;
+            public float gravityScale;
+            public bool maintainInertia;
+            public float inertiaDecay;
+            public bool smoothGravityTransition;
+            public float transitionSpeed;
+            public float maxVelocityChange;
+        }
+
+        // オリジナル設定値を保存
+        private GravityConfiguration originalGravityConfig;
+        private bool gravityConfigSaved = false;
+
         // State
         public PlayerState currentState { get; private set; } = PlayerState.Running;
         public GravityDirection gravityDirection { get; private set; } = GravityDirection.Down;
@@ -151,12 +175,57 @@ namespace GravityFlipLab.Player
                 gravityAffected.gravityScale = stats.gravityScale;
                 gravityAffected.useCustomGravity = true;
                 gravityAffected.smoothGravityTransition = true;
-                gravityAffected.transitionSpeed = 10f; // Fast transition for responsive feel
+                gravityAffected.transitionSpeed = 10f;
                 gravityAffected.maintainInertia = stats.preserveHorizontalMomentum;
                 gravityAffected.inertiaDecay = 0.95f;
                 gravityAffected.maxVelocityChange = stats.maxVelocityMagnitude;
+
+                // 初期設定値を保存（一度だけ）
+                SaveOriginalGravityConfiguration();
             }
         }
+        /// <summary>
+        /// オリジナルの重力設定を保存
+        /// </summary>
+        private void SaveOriginalGravityConfiguration()
+        {
+            if (gravityConfigSaved || gravityAffected == null) return;
+
+            originalGravityConfig = new GravityConfiguration
+            {
+                useCustomGravity = gravityAffected.useCustomGravity,
+                gravityScale = gravityAffected.gravityScale,
+                maintainInertia = gravityAffected.maintainInertia,
+                inertiaDecay = gravityAffected.inertiaDecay,
+                smoothGravityTransition = gravityAffected.smoothGravityTransition,
+                transitionSpeed = gravityAffected.transitionSpeed,
+                maxVelocityChange = gravityAffected.maxVelocityChange
+            };
+
+            gravityConfigSaved = true;
+
+            if (debugMode)
+                Debug.Log($"PlayerController: Original gravity config saved - maintainInertia: {originalGravityConfig.maintainInertia}, inertiaDecay: {originalGravityConfig.inertiaDecay}");
+        }
+        /// <summary>
+        /// オリジナルの重力設定を復元
+        /// </summary>
+        public void RestoreOriginalGravityConfiguration()
+        {
+            if (!gravityConfigSaved || gravityAffected == null) return;
+
+            gravityAffected.useCustomGravity = originalGravityConfig.useCustomGravity;
+            gravityAffected.gravityScale = originalGravityConfig.gravityScale;
+            gravityAffected.maintainInertia = originalGravityConfig.maintainInertia;
+            gravityAffected.inertiaDecay = originalGravityConfig.inertiaDecay;
+            gravityAffected.smoothGravityTransition = originalGravityConfig.smoothGravityTransition;
+            gravityAffected.transitionSpeed = originalGravityConfig.transitionSpeed;
+            gravityAffected.maxVelocityChange = originalGravityConfig.maxVelocityChange;
+
+            if (debugMode)
+                Debug.Log($"PlayerController: Original gravity config restored - maintainInertia: {gravityAffected.maintainInertia}, inertiaDecay: {gravityAffected.inertiaDecay}");
+        }
+
 
         private void Initialize()
         {
@@ -466,77 +535,295 @@ namespace GravityFlipLab.Player
             isAlive = false;
             ChangeState(PlayerState.Dead);
 
-            // Stop movement
+            // 移動を停止
             rb2d.linearVelocity = Vector2.zero;
             rb2d.gravityScale = 0;
 
-            // Disable gravity effects
+            // 重力エフェクトを無効化
             if (gravityAffected != null)
                 gravityAffected.useCustomGravity = false;
 
-            // Play death effects
+            // エフェクト再生
             if (playerVisuals != null) playerVisuals.PlayDeathEffect();
             if (playerAnimation != null) playerAnimation.PlayDeathAnimation();
 
+            // リスポーン処理の決定
+            isRespawnHandled = false;
+
+            // イベント発火（他システムが処理する可能性）
             OnPlayerDeath?.Invoke();
 
-            // Respawn after delay
-            StartCoroutine(RespawnCoroutine());
+            // 少し待ってから、他システムが処理していない場合のフォールバック
+            StartCoroutine(CheckAndFallbackRespawn());
         }
 
-        private IEnumerator RespawnCoroutine()
-        {
-            yield return new WaitForSeconds(1.0f);
-            Respawn();
-        }
         /// <summary>
-        /// PlayerMovementコンポーネントの初期化を確実に実行
+        /// 他システムがリスポーンを処理しているかチェックし、
+        /// 処理されていない場合はフォールバック処理を実行
         /// </summary>
-        private void InitializePlayerMovement()
+        private IEnumerator CheckAndFallbackRespawn()
+        {
+            // 他システムの処理を待つ
+            yield return new WaitForSeconds(0.1f);
+
+            // 統合システムの存在チェック
+            bool hasIntegratedSystem = CheckForIntegratedRespawnSystems();
+
+            if (useIntegratedRespawnSystem && hasIntegratedSystem)
+            {
+                if (debugMode)
+                    Debug.Log("PlayerController: Respawn handled by integrated system");
+                yield break; // 統合システムに任せる
+            }
+
+            // フォールバック：従来のリスポーン処理
+            if (debugMode)
+                Debug.Log("PlayerController: Using fallback respawn");
+
+            respawnCoroutine = StartCoroutine(FallbackRespawnCoroutine());
+        }
+
+        /// <summary>
+        /// 統合リスポーンシステムの存在チェック
+        /// </summary>
+        private bool CheckForIntegratedRespawnSystems()
+        {
+            // RespawnIntegrationの存在チェック
+            var respawnIntegration = GetComponent<RespawnIntegration>();
+            if (respawnIntegration != null)
+            {
+                return true;
+            }
+
+            // CheckpointManagerの統合設定チェック
+            if (CheckpointManager.Instance != null &&
+                CheckpointManager.Instance.useRespawnIntegration)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// フォールバック用のリスポーンコルーチン
+        /// </summary>
+        private IEnumerator FallbackRespawnCoroutine()
+        {
+            yield return new WaitForSeconds(fallbackRespawnDelay);
+
+            if (!isRespawnHandled)
+            {
+                FallbackRespawn();
+            }
+        }
+
+        /// <summary>
+        /// フォールバック用のリスポーン処理（重力に配慮）
+        /// </summary>
+        private void FallbackRespawn()
+        {
+            if (isRespawnHandled) return;
+
+            isRespawnHandled = true;
+
+            // チェックポイント位置を取得
+            Vector3 respawnPosition = Vector3.zero;
+            if (CheckpointManager.Instance != null)
+            {
+                respawnPosition = CheckpointManager.Instance.GetCurrentCheckpointPosition();
+            }
+            else
+            {
+                // 緊急フォールバック
+                respawnPosition = transform.position + Vector3.up * 2f;
+            }
+
+            // 位置リセット
+            transform.position = respawnPosition;
+
+            // 基本状態リセット
+            isAlive = true;
+            gravityDirection = GravityDirection.Down;
+            ChangeState(PlayerState.Running);
+
+            // 物理状態リセット（重力設定は保守的に）
+            rb2d.linearVelocity = Vector2.zero;
+            rb2d.gravityScale = stats.gravityScale;
+
+            // 重力システムを有効化（保守的）
+            if (gravityAffected != null)
+            {
+                gravityAffected.useCustomGravity = true;
+                gravityAffected.gravityScale = stats.gravityScale;
+            }
+
+            // PlayerMovementの再初期化
+            InitializePlayerMovementSafely();
+
+            // ビジュアルリセット
+            if (playerVisuals != null)
+                playerVisuals.ResetVisuals();
+
+            OnPlayerRespawn?.Invoke();
+
+            if (debugMode)
+                Debug.Log("PlayerController: Fallback respawn completed");
+        }
+
+        /// <summary>
+        /// 外部システムからリスポーン完了を通知
+        /// </summary>
+        public void NotifyRespawnHandled()
+        {
+            isRespawnHandled = true;
+
+            // 進行中のフォールバックコルーチンを停止
+            if (respawnCoroutine != null)
+            {
+                StopCoroutine(respawnCoroutine);
+                respawnCoroutine = null;
+            }
+
+            if (debugMode)
+                Debug.Log("PlayerController: Respawn handled notification received");
+        }
+
+        /// <summary>
+        /// 外部システム用の軽量リスポーン（位置設定とイベント発火のみ）
+        /// </summary>
+        public void ExternalRespawn(Vector3 position)
+        {
+            if (isRespawnHandled) return;
+
+            // 他システムがリスポーン処理中であることを記録
+            NotifyRespawnHandled();
+
+            // 最小限の状態リセット
+            transform.position = position;
+            isAlive = true;
+            gravityDirection = GravityDirection.Down;
+            ChangeState(PlayerState.Running);
+
+            // 物理状態の最小限リセット
+            rb2d.linearVelocity = Vector2.zero;
+            rb2d.angularVelocity = 0f;
+
+            // 重要：オリジナル重力設定を復元（新しい値を設定しない）
+            RestoreOriginalGravityConfiguration();
+
+            // ビジュアルリセット
+            if (playerVisuals != null)
+                playerVisuals.ResetVisuals();
+
+            OnPlayerRespawn?.Invoke();
+
+            if (debugMode)
+                Debug.Log($"PlayerController: External respawn at {position}");
+        }
+
+        /// <summary>
+        /// 従来のRespawnメソッド（既存システムとの互換性のため保持）
+        /// </summary>
+        public void Respawn()
+        {
+            // 既に他システムで処理済みの場合はスキップ
+            if (isRespawnHandled)
+            {
+                if (debugMode)
+                    Debug.Log("PlayerController: Respawn skipped (already handled)");
+                return;
+            }
+
+            // フォールバックリスポーンを実行
+            FallbackRespawn();
+        }
+
+        /// <summary>
+        /// PlayerMovementコンポーネントの安全な初期化（重力設定保護版）
+        /// </summary>
+        private void InitializePlayerMovementSafely()
         {
             var playerMovement = GetComponent<PlayerMovement>();
             if (playerMovement != null)
             {
-                // PlayerMovementを初期化してnull参照を防ぐ
+                // PlayerMovementを初期化
                 playerMovement.Initialize(this);
 
                 // 物理状態の検証
                 playerMovement.ValidatePhysicsState();
 
+                // 重要：オリジナル設定を復元（上書きしない）
+                RestoreOriginalGravityConfiguration();
+
                 if (debugMode)
-                    Debug.Log("PlayerController: PlayerMovement reinitialized on respawn");
+                    Debug.Log("PlayerController: PlayerMovement safely reinitialized with original gravity config");
             }
         }
 
-        public void Respawn()
+        /// <summary>
+        /// リスポーン状態のリセット（新しいステージ開始時等に使用）
+        /// </summary>
+        public void ResetRespawnState()
         {
-            // Reset position to last checkpoint
-            Vector3 respawnPosition = CheckpointManager.Instance.GetCurrentCheckpointPosition();
-            transform.position = respawnPosition;
+            isRespawnHandled = false;
 
-            // Reset state
-            isAlive = true;
-            gravityDirection = GravityDirection.Down;
-            ChangeState(PlayerState.Running);
-
-            // Reset physics
-            rb2d.gravityScale = stats.gravityScale;
-            rb2d.linearVelocity = Vector2.zero;
-
-            // Re-enable gravity effects
-            if (gravityAffected != null)
+            if (respawnCoroutine != null)
             {
-                gravityAffected.useCustomGravity = true;
-                gravityAffected.ResetToOriginalGravity();
+                StopCoroutine(respawnCoroutine);
+                respawnCoroutine = null;
             }
 
-            // PlayerMovementコンポーネントの再初期化
-            InitializePlayerMovement();
+            if (debugMode)
+                Debug.Log("PlayerController: Respawn state reset");
+        }
 
-            // Reset visuals
-            if (playerVisuals != null) playerVisuals.ResetVisuals();
+        /// <summary>
+        /// 緊急時のリスポーン（デバッグ用）
+        /// </summary>
+        public void EmergencyRespawn()
+        {
+            isRespawnHandled = false;
 
-            OnPlayerRespawn?.Invoke();
+            if (respawnCoroutine != null)
+            {
+                StopCoroutine(respawnCoroutine);
+                respawnCoroutine = null;
+            }
+
+            FallbackRespawn();
+
+            if (debugMode)
+                Debug.Log("PlayerController: Emergency respawn executed");
+        }
+
+        // Public API for respawn status
+        public bool IsRespawnHandled => isRespawnHandled;
+        public bool UseIntegratedRespawnSystem => useIntegratedRespawnSystem;
+
+        // Configuration methods
+        public void SetUseIntegratedRespawnSystem(bool use)
+        {
+            useIntegratedRespawnSystem = use;
+        }
+
+        public void SetFallbackRespawnDelay(float delay)
+        {
+            fallbackRespawnDelay = Mathf.Max(0.1f, delay);
+        }
+
+        /// <summary>
+        /// 重力設定の緊急確認と修正
+        /// </summary>
+        public void ValidateGravitySettings()
+        {
+            if (gravityAffected != null)
+            {
+                gravityAffected.EnsureCustomGravityEnabled();
+
+                if (debugMode)
+                    Debug.Log($"PlayerController: Gravity validation - useCustomGravity: {gravityAffected.useCustomGravity}, rb2d.gravityScale: {rb2d.gravityScale}");
+            }
         }
 
         private void ChangeState(PlayerState newState)

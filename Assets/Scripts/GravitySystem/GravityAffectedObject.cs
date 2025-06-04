@@ -197,8 +197,49 @@ namespace GravityFlipLab.Physics
             }
             else
             {
-                InstantReset();
+                // InstantReset()を修正版に変更
+                InstantResetMinimal();
             }
+        }
+        /// <summary>
+        /// 最小限の即座リセット（useCustomGravityは保持）
+        /// </summary>
+        private void InstantResetMinimal()
+        {
+            // 重力方向と強度のみリセット
+            currentGravity = originalGravityDirection * originalGravityScale * 9.81f;
+            targetGravity = currentGravity;
+
+            // useCustomGravityは変更しない（保持）
+            // rb2d.gravityScaleも現在の設定に合わせて調整
+            if (useCustomGravity)
+            {
+                rb2d.gravityScale = 0f;
+            }
+            // else は既存の値を保持
+
+            // 速度調整（必要最小限）
+            if (!preserveVelocityOnReset && rb2d != null)
+            {
+                Vector2 velocity = rb2d.linearVelocity;
+                Vector2 currentGravityDir = currentGravity.normalized;
+                Vector2 originalGravityDir = originalGravityDirection.normalized;
+
+                if (Vector2.Dot(currentGravityDir, originalGravityDir) < 0.9f)
+                {
+                    Vector2 gravityVelocity = Vector3.Project(velocity, originalGravityDir);
+                    velocity -= gravityVelocity;
+                    rb2d.linearVelocity = velocity;
+                }
+            }
+
+            // 他のコンポーネントに通知
+            NotifyOtherComponents();
+
+            // イベント発火
+            OnGravityReset?.Invoke();
+
+            Debug.Log("GravityAffectedObject: Minimal reset completed (useCustomGravity preserved)");
         }
 
         /// <summary>
@@ -221,9 +262,15 @@ namespace GravityFlipLab.Physics
         /// </summary>
         private void InstantReset()
         {
-            // Custom gravityを無効化してUnityの標準重力に戻す
-            useCustomGravity = false;
-            rb2d.gravityScale = originalRigidbodyGravityScale;
+            // Rigidbody2Dの設定は現在のuseCustomGravityに応じて設定
+            if (useCustomGravity)
+            {
+                rb2d.gravityScale = 0f; // カスタム重力使用時
+            }
+            else
+            {
+                rb2d.gravityScale = originalRigidbodyGravityScale; // Unity標準重力使用時
+            }
 
             // 速度リセット（オプション）
             if (!preserveVelocityOnReset && rb2d != null)
@@ -289,10 +336,16 @@ namespace GravityFlipLab.Physics
                 currentGravity = Vector2.Lerp(startGravity, targetResetGravity, t);
                 targetGravity = currentGravity;
 
-                // Rigidbody gravity scaleの補間
+                // Rigidbody gravity scaleの補間（useCustomGravityに応じて）
                 if (useCustomGravity)
                 {
-                    rb2d.gravityScale = Mathf.Lerp(0f, originalRigidbodyGravityScale, t);
+                    // カスタム重力使用時は0を維持
+                    rb2d.gravityScale = 0f;
+                }
+                else
+                {
+                    // Unity標準重力使用時は元の値に向かって補間
+                    rb2d.gravityScale = Mathf.Lerp(startGravityScale, originalRigidbodyGravityScale, t);
                 }
 
                 elapsedTime += Time.fixedDeltaTime;
@@ -303,9 +356,15 @@ namespace GravityFlipLab.Physics
             currentGravity = targetResetGravity;
             targetGravity = currentGravity;
 
-            // Custom gravityを無効化
-            useCustomGravity = false;
-            rb2d.gravityScale = originalRigidbodyGravityScale;
+            // 最終的なgravityScaleを設定
+            if (useCustomGravity)
+            {
+                rb2d.gravityScale = 0f;
+            }
+            else
+            {
+                rb2d.gravityScale = originalRigidbodyGravityScale;
+            }
 
             // 速度調整
             if (!preserveVelocityOnReset)
@@ -626,6 +685,24 @@ namespace GravityFlipLab.Physics
                 activeZoneCount = activeZones.Count,
                 respondsToSystemReset = respondToSystemReset
             };
+        }
+        /// <summary>
+        /// useCustomGravityの状態を強制的に有効化
+        /// </summary>
+        public void EnsureCustomGravityEnabled()
+        {
+            if (!useCustomGravity)
+            {
+                useCustomGravity = true;
+
+                // Rigidbody2Dの設定も更新
+                if (rb2d != null)
+                {
+                    rb2d.gravityScale = 0f;
+                }
+
+                Debug.Log("GravityAffectedObject: useCustomGravity forcibly enabled");
+            }
         }
     }
 
