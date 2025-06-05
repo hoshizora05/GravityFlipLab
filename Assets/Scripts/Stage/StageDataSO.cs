@@ -38,12 +38,16 @@ namespace GravityFlipLab.Stage
         public bool enableProceduralGeneration = false;
         public int proceduralSeed = 0;
 
+        [Header("Slopes")]
+        public List<SlopeData> slopes = new List<SlopeData>();
+
         private void OnValidate()
         {
             // 初期化処理
             InitializeTerrainLayers();
             InitializeTerrainSegments();
             ValidateTerrainData();
+            ValidateSlopes();
         }
 
         private void InitializeTerrainLayers()
@@ -353,6 +357,179 @@ namespace GravityFlipLab.Stage
 
             return stats;
         }
+        public void ValidateSlopes()
+        {
+            // 傾斜データの検証
+            if (slopes != null)
+            {
+                for (int i = 0; i < slopes.Count; i++)
+                {
+                    var slope = slopes[i];
+                    if (slope != null && !slope.IsValid())
+                    {
+                        Debug.LogWarning($"Invalid slope data at index {i} in {name}");
+
+                        // 自動修正を試行
+                        if (slope.slopeAngle <= 0f || slope.slopeAngle > 60f)
+                        {
+                            slope.slopeAngle = Mathf.Clamp(slope.slopeAngle, 5f, 45f);
+                        }
+                        if (slope.slopeLength <= 0f)
+                        {
+                            slope.slopeLength = 5f;
+                        }
+                        if (slope.speedMultiplier <= 0f)
+                        {
+                            slope.speedMultiplier = 1.2f;
+                        }
+                    }
+                }
+            }
+        }
+        // エディター用のコンテキストメニューを追加
+        [ContextMenu("Add Sample Slopes")]
+        public void AddSampleSlopes()
+        {
+            if (slopes == null)
+                slopes = new List<SlopeData>();
+
+            // 基本的な傾斜のサンプルを追加
+            slopes.Add(SlopeDataHelper.CreateBasicSlope(new Vector3(20f, -2f, 0f), 30f, SlopeDirection.Ascending));
+            slopes.Add(SlopeDataHelper.CreateSteepSlope(new Vector3(35f, -2f, 0f), SlopeDirection.Descending));
+            slopes.Add(SlopeDataHelper.CreateGentleSlope(new Vector3(50f, -2f, 0f), SlopeDirection.Ascending));
+            slopes.Add(SlopeDataHelper.CreateSpringSlope(new Vector3(65f, -2f, 0f), 20f));
+            slopes.Add(SlopeDataHelper.CreateIceSlope(new Vector3(80f, -2f, 0f), 35f, SlopeDirection.Descending));
+
+            Debug.Log($"Added 5 sample slopes to {name}");
+        }
+
+        [ContextMenu("Create Hill Pattern")]
+        public void CreateHillPattern()
+        {
+            if (slopes == null)
+                slopes = new List<SlopeData>();
+
+            // 山型パターンの追加
+            var hillSlopes = SlopeDataHelper.CreateHillSlopes(new Vector3(100f, -2f, 0f), 8f);
+            slopes.AddRange(hillSlopes);
+
+            Debug.Log($"Added hill pattern to {name}");
+        }
+
+        [ContextMenu("Create Stair Pattern")]
+        public void CreateStairPattern()
+        {
+            if (slopes == null)
+                slopes = new List<SlopeData>();
+
+            // 階段パターンの追加
+            var stairSlopes = SlopeDataHelper.CreateStairSlopes(new Vector3(120f, -2f, 0f), 4, 5f);
+            slopes.AddRange(stairSlopes);
+
+            Debug.Log($"Added stair pattern to {name}");
+        }
+
+        [ContextMenu("Clear All Slopes")]
+        public void ClearAllSlopes()
+        {
+            if (slopes != null)
+            {
+                int count = slopes.Count;
+                slopes.Clear();
+                Debug.Log($"Cleared {count} slopes from {name}");
+            }
+        }
+
+        [ContextMenu("Validate Slopes")]
+        public void ValidateSlopesManually()
+        {
+            if (slopes == null)
+            {
+                Debug.Log("No slopes to validate");
+                return;
+            }
+
+            bool isValid = SlopeDataValidator.ValidateSlopeDataList(slopes);
+            SlopeDataValidator.LogSlopeInfo(slopes);
+
+            if (isValid)
+            {
+                Debug.Log($"All {slopes.Count} slopes are valid in {name}");
+            }
+        }
+
+        // ランタイム用のアクセサメソッド
+        public List<SlopeData> GetSlopes()
+        {
+            return slopes ?? new List<SlopeData>();
+        }
+
+        public SlopeData GetSlopeByIndex(int index)
+        {
+            if (slopes == null || index < 0 || index >= slopes.Count)
+                return null;
+            return slopes[index];
+        }
+
+        public List<SlopeData> GetSlopesByType(SlopeType type)
+        {
+            List<SlopeData> result = new List<SlopeData>();
+            if (slopes != null)
+            {
+                foreach (var slope in slopes)
+                {
+                    if (slope != null && slope.type == type)
+                    {
+                        result.Add(slope);
+                    }
+                }
+            }
+            return result;
+        }
+
+        public bool HasSlopes()
+        {
+            return slopes != null && slopes.Count > 0;
+        }
+
+        public int GetSlopeCount()
+        {
+            return slopes?.Count ?? 0;
+        }
+
+        public void AddSlopeStatistics(ref TerrainStatistics stats)
+        {
+            if (slopes != null)
+            {
+                stats.totalSlopes = slopes.Count;
+
+                // タイプ別カウント
+                foreach (var slope in slopes)
+                {
+                    if (slope != null)
+                    {
+                        switch (slope.type)
+                        {
+                            case SlopeType.BasicSlope:
+                                stats.basicSlopes++;
+                                break;
+                            case SlopeType.SteepSlope:
+                                stats.steepSlopes++;
+                                break;
+                            case SlopeType.SpringSlope:
+                                stats.specialSlopes++;
+                                break;
+                            case SlopeType.IceSlope:
+                                stats.specialSlopes++;
+                                break;
+                            default:
+                                stats.otherSlopes++;
+                                break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     [System.Serializable]
@@ -366,6 +543,13 @@ namespace GravityFlipLab.Stage
         public int totalPlatforms;
         public int totalFeatures;
 
+        [Header("Slope Statistics")]
+        public int totalSlopes;
+        public int basicSlopes;
+        public int steepSlopes;
+        public int specialSlopes;
+        public int otherSlopes;
+
         public float GetDifficultyScore()
         {
             float baseScore = 0f;
@@ -376,10 +560,21 @@ namespace GravityFlipLab.Stage
 
             return baseScore / Mathf.Max(1, totalSegments);
         }
+        // 難易度計算に傾斜を含める
+        public float CalculateSlopeDifficulty()
+        {
+            float slopeScore = 0f;
+            slopeScore += basicSlopes * 0.5f;
+            slopeScore += steepSlopes * 1.2f;
+            slopeScore += specialSlopes * 1.5f;
+            slopeScore += otherSlopes * 0.8f;
+
+            return slopeScore;
+        }
 
         public override string ToString()
         {
-            return $"Segments: {totalSegments}, Platforms: {totalPlatforms}, Features: {totalFeatures}, Difficulty: {GetDifficultyScore():F1}";
+            return $"Segments: {totalSegments}, Platforms: {totalPlatforms}, Features: {totalFeatures}, Difficulty: {GetDifficultyScore():F1} Slopes: {totalSlopes} (Basic: {basicSlopes}, Steep: {steepSlopes}, Special: {specialSlopes})";
         }
     }
 }

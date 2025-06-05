@@ -92,6 +92,14 @@ namespace GravityFlipLab.Stage
         private bool isInitializing = false;
         private static bool isApplicationQuitting = false;
 
+        [Header("Slope System")]
+        public Transform slopeParent;
+        public GameObject[] slopePrefabs = new GameObject[8]; // 各SlopeType用
+
+        // 現在アクティブな傾斜オブジェクト
+        private List<SlopeObject> activeSlopes = new List<SlopeObject>();
+
+
         private void Awake()
         {
             // StageManagerはシーン固有のため、重複チェックのみ行う
@@ -323,6 +331,12 @@ namespace GravityFlipLab.Stage
                 environmentalParent.SetParent(transform);
             }
 
+            if (slopeParent == null)
+            {
+                slopeParent = new GameObject("Slopes").transform;
+                slopeParent.SetParent(transform);
+            }
+
             Debug.Log("StageManager: Parent objects created/verified");
         }
 
@@ -474,6 +488,8 @@ namespace GravityFlipLab.Stage
 
             // Load environmental objects
             yield return StartCoroutine(LoadEnvironmental());
+
+            yield return StartCoroutine(LoadSlopes());
 
             // Setup goal
             SetupGoal();
@@ -887,6 +903,282 @@ namespace GravityFlipLab.Stage
                 yield return null;
             }
         }
+        private IEnumerator LoadSlopes()
+        {
+            Debug.Log($"StageManager: Loading {currentStageData.GetSlopeCount()} slopes");
+
+            var slopes = currentStageData.GetSlopes();
+            foreach (var slopeData in slopes)
+            {
+                if (slopeData != null)
+                {
+                    GameObject prefab = GetSlopePrefab(slopeData.type);
+                    if (prefab != null)
+                    {
+                        GameObject instance = Instantiate(prefab, slopeParent);
+                        instance.transform.position = slopeData.position;
+                        instance.transform.rotation = Quaternion.Euler(slopeData.rotation);
+                        instance.transform.localScale = slopeData.scale;
+
+                        SlopeObject slopeObject = instance.GetComponent<SlopeObject>();
+                        if (slopeObject != null)
+                        {
+                            ApplySlopeDataToObject(slopeObject, slopeData);
+                            activeSlopes.Add(slopeObject);
+                        }
+                        else
+                        {
+                            // プレハブにSlopeObjectコンポーネントがない場合は追加
+                            slopeObject = instance.AddComponent<SlopeObject>();
+                            ApplySlopeDataToObject(slopeObject, slopeData);
+                            activeSlopes.Add(slopeObject);
+                        }
+                    }
+                    else
+                    {
+                        // プレハブが設定されていない場合はデフォルト傾斜を作成
+                        CreateDefaultSlope(slopeData);
+                    }
+                }
+                yield return null; // フレーム分散
+            }
+
+            Debug.Log($"StageManager: Loaded {activeSlopes.Count} slope objects");
+        }
+
+        // 傾斜データをSlopeObjectに適用
+        private void ApplySlopeDataToObject(SlopeObject slopeObject, SlopeData slopeData)
+        {
+            if (slopeObject == null || slopeData == null) return;
+
+            // 基本設定の適用
+            var settings = slopeObject.GetSlopeSettings();
+            settings.slopeAngle = slopeData.slopeAngle;
+            settings.slopeDirection = slopeData.slopeDirection;
+            settings.slopeLength = slopeData.slopeLength;
+            settings.speedMultiplier = slopeData.speedMultiplier;
+            settings.affectGravity = slopeData.affectGravity;
+            settings.gravityRedirection = slopeData.gravityRedirection;
+
+            slopeObject.SetSlopeSettings(settings);
+
+            // 特殊パラメータの適用
+            ApplySpecialSlopeParameters(slopeObject, slopeData);
+        }
+
+        // 特殊傾斜パラメータの適用
+        private void ApplySpecialSlopeParameters(SlopeObject slopeObject, SlopeData slopeData)
+        {
+            switch (slopeData.type)
+            {
+                case SlopeType.SpringSlope:
+                    var springComponent = slopeObject.GetComponent<SpringSlopeEffect>();
+                    if (springComponent == null)
+                        springComponent = slopeObject.gameObject.AddComponent<SpringSlopeEffect>();
+
+                    float bounceForce = slopeData.GetParameter("bounceForce", 15f);
+                    springComponent.bounceForce = bounceForce;
+                    break;
+
+                case SlopeType.IceSlope:
+                    var iceComponent = slopeObject.GetComponent<IceSlopeEffect>();
+                    if (iceComponent == null)
+                        iceComponent = slopeObject.gameObject.AddComponent<IceSlopeEffect>();
+
+                    float friction = slopeData.GetParameter("friction", 0.1f);
+                    iceComponent.friction = friction;
+                    break;
+
+                case SlopeType.RoughSlope:
+                    var roughComponent = slopeObject.GetComponent<RoughSlopeEffect>();
+                    if (roughComponent == null)
+                        roughComponent = slopeObject.gameObject.AddComponent<RoughSlopeEffect>();
+
+                    float roughFriction = slopeData.GetParameter("friction", 2.0f);
+                    roughComponent.friction = roughFriction;
+                    break;
+
+                case SlopeType.GravitySlope:
+                    var gravityComponent = slopeObject.GetComponent<GravitySlopeEffect>();
+                    if (gravityComponent == null)
+                        gravityComponent = slopeObject.gameObject.AddComponent<GravitySlopeEffect>();
+
+                    float gravityMultiplier = slopeData.GetParameter("gravityMultiplier", 2.0f);
+                    gravityComponent.gravityMultiplier = gravityMultiplier;
+                    break;
+
+                case SlopeType.WindSlope:
+                    var windComponent = slopeObject.GetComponent<WindSlopeEffect>();
+                    if (windComponent == null)
+                        windComponent = slopeObject.gameObject.AddComponent<WindSlopeEffect>();
+
+                    Vector2 windDirection = slopeData.GetParameter("windDirection", Vector2.right);
+                    float windForce = slopeData.GetParameter("windForce", 10f);
+                    windComponent.windDirection = windDirection;
+                    windComponent.windForce = windForce;
+                    break;
+            }
+        }
+
+        // デフォルト傾斜の作成
+        private void CreateDefaultSlope(SlopeData slopeData)
+        {
+            GameObject defaultSlope = new GameObject($"Slope_{slopeData.type}_{slopeData.position.x}_{slopeData.position.y}");
+            defaultSlope.transform.SetParent(slopeParent);
+            defaultSlope.transform.position = slopeData.position;
+            defaultSlope.transform.rotation = Quaternion.Euler(slopeData.rotation);
+            defaultSlope.transform.localScale = slopeData.scale;
+
+            // 基本的なビジュアルコンポーネント
+            SpriteRenderer renderer = defaultSlope.AddComponent<SpriteRenderer>();
+            renderer.sprite = CreateDefaultSlopeSprite(slopeData.type);
+            renderer.color = GetSlopeTypeColor(slopeData.type);
+
+            // コライダーの追加
+            BoxCollider2D collider = defaultSlope.AddComponent<BoxCollider2D>();
+            collider.isTrigger = true;
+            collider.size = new Vector2(slopeData.slopeLength, 1f);
+
+            // SlopeObjectコンポーネントの追加
+            SlopeObject slopeObject = defaultSlope.AddComponent<SlopeObject>();
+            ApplySlopeDataToObject(slopeObject, slopeData);
+
+            activeSlopes.Add(slopeObject);
+
+            Debug.Log($"StageManager: Created default slope: {slopeData.type} at {slopeData.position}");
+        }
+
+        // 傾斜プレハブの取得
+        private GameObject GetSlopePrefab(SlopeType type)
+        {
+            int index = (int)type;
+            return index < slopePrefabs.Length ? slopePrefabs[index] : null;
+        }
+
+        // デフォルト傾斜スプライトの作成
+        private Sprite CreateDefaultSlopeSprite(SlopeType type)
+        {
+            // 16x64の傾斜形状テクスチャを作成
+            Texture2D texture = new Texture2D(64, 16);
+            Color[] pixels = new Color[64 * 16];
+            Color slopeColor = GetSlopeTypeColor(type);
+
+            // 三角形の傾斜形状を作成
+            for (int x = 0; x < 64; x++)
+            {
+                for (int y = 0; y < 16; y++)
+                {
+                    // 傾斜の形状を決定
+                    float slopeHeight = (x / 64f) * 16f;
+                    if (y <= slopeHeight)
+                    {
+                        pixels[y * 64 + x] = slopeColor;
+                    }
+                    else
+                    {
+                        pixels[y * 64 + x] = Color.clear;
+                    }
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+
+            return Sprite.Create(texture, new Rect(0, 0, 64, 16), new Vector2(0.5f, 0f), 16f);
+        }
+
+        // 傾斜タイプに応じた色の取得
+        private Color GetSlopeTypeColor(SlopeType type)
+        {
+            switch (type)
+            {
+                case SlopeType.BasicSlope: return Color.gray;
+                case SlopeType.SteepSlope: return Color.red;
+                case SlopeType.GentleSlope: return Color.green;
+                case SlopeType.SpringSlope: return Color.yellow;
+                case SlopeType.IceSlope: return Color.cyan;
+                case SlopeType.RoughSlope: return Color.blue;
+                case SlopeType.GravitySlope: return Color.magenta;
+                case SlopeType.WindSlope: return Color.white;
+                default: return Color.gray;
+            }
+        }
+        public List<SlopeObject> GetActiveSlopes()
+        {
+            return new List<SlopeObject>(activeSlopes);
+        }
+
+        public SlopeObject GetSlopeAtPosition(Vector3 position, float tolerance = 1f)
+        {
+            foreach (var slope in activeSlopes)
+            {
+                if (slope != null && Vector3.Distance(slope.transform.position, position) <= tolerance)
+                {
+                    return slope;
+                }
+            }
+            return null;
+        }
+
+        public List<SlopeObject> GetSlopesByType(SlopeType type)
+        {
+            List<SlopeObject> result = new List<SlopeObject>();
+            foreach (var slope in activeSlopes)
+            {
+                if (slope != null && slope.GetSlopeSettings().slopeDirection.ToString().Contains(type.ToString()))
+                {
+                    result.Add(slope);
+                }
+            }
+            return result;
+        }
+
+        public int GetActiveSlopeCount()
+        {
+            return activeSlopes.Count;
+        }
+        // 動的傾斜操作メソッド
+        public SlopeObject AddSlopeAtPosition(Vector3 position, SlopeType type, float angle = 30f, SlopeDirection direction = SlopeDirection.Ascending)
+        {
+            var slopeData = new SlopeData(type, position, angle, direction);
+
+            GameObject prefab = GetSlopePrefab(type);
+            GameObject instance;
+
+            if (prefab != null)
+            {
+                instance = Instantiate(prefab, slopeParent);
+            }
+            else
+            {
+                // デフォルト傾斜を作成
+                CreateDefaultSlope(slopeData);
+                return activeSlopes[activeSlopes.Count - 1];
+            }
+
+            instance.transform.position = position;
+
+            SlopeObject slopeObject = instance.GetComponent<SlopeObject>();
+            if (slopeObject == null)
+                slopeObject = instance.AddComponent<SlopeObject>();
+
+            ApplySlopeDataToObject(slopeObject, slopeData);
+            activeSlopes.Add(slopeObject);
+
+            return slopeObject;
+        }
+
+        public bool RemoveSlopeAtPosition(Vector3 position, float tolerance = 1f)
+        {
+            SlopeObject slope = GetSlopeAtPosition(position, tolerance);
+            if (slope != null)
+            {
+                activeSlopes.Remove(slope);
+                DestroyImmediate(slope.gameObject);
+                return true;
+            }
+            return false;
+        }
 
         private void InitializeStage()
         {
@@ -1181,6 +1473,14 @@ namespace GravityFlipLab.Stage
             }
             activeSegments.Clear();
 
+            // Clear slope objects
+            foreach (var slope in activeSlopes)
+            {
+                if (slope != null)
+                    DestroyImmediate(slope.gameObject);
+            }
+            activeSlopes.Clear();
+
             stageLoaded = false;
             Debug.Log("StageManager: Stage cleared successfully");
         }
@@ -1352,6 +1652,61 @@ namespace GravityFlipLab.Stage
             }
 
             return allValid;
+        }
+        public void ValidateAllSlopes()
+        {
+            int validCount = 0;
+            int invalidCount = 0;
+
+            foreach (var slope in activeSlopes)
+            {
+                if (slope != null)
+                {
+                    var settings = slope.GetSlopeSettings();
+                    if (settings.slopeAngle > 0f && settings.slopeAngle <= 60f && settings.slopeLength > 0f)
+                    {
+                        validCount++;
+                    }
+                    else
+                    {
+                        invalidCount++;
+                        Debug.LogWarning($"Invalid slope detected at {slope.transform.position}");
+                    }
+                }
+                else
+                {
+                    invalidCount++;
+                }
+            }
+
+            Debug.Log($"Slope validation: {validCount} valid, {invalidCount} invalid");
+        }
+        public SlopeStatistics GetSlopeStatistics()
+        {
+            SlopeStatistics stats = new SlopeStatistics();
+            stats.totalSlopes = activeSlopes.Count;
+
+            foreach (var slope in activeSlopes)
+            {
+                if (slope != null)
+                {
+                    // タイプ別統計は傾斜の設定から推測
+                    var settings = slope.GetSlopeSettings();
+                    if (settings.slopeAngle > 40f)
+                        stats.steepSlopes++;
+                    else if (settings.slopeAngle < 20f)
+                        stats.gentleSlopes++;
+                    else
+                        stats.normalSlopes++;
+
+                    if (settings.speedMultiplier > 1.5f)
+                        stats.accelerationSlopes++;
+                    else if (settings.speedMultiplier < 1f)
+                        stats.decelerationSlopes++;
+                }
+            }
+
+            return stats;
         }
 
         private bool IsPositionAccessible(Vector3 position)
@@ -1622,6 +1977,23 @@ namespace GravityFlipLab.Stage
                     Gizmos.DrawWireCube(autoCheckpointPos, Vector3.one * 0.5f);
                 }
             }
+
+            // アクティブな傾斜を表示
+            if (Application.isPlaying && activeSlopes != null)
+            {
+                foreach (var slope in activeSlopes)
+                {
+                    if (slope != null)
+                    {
+                        Gizmos.color = Color.yellow;
+                        Gizmos.DrawWireCube(slope.transform.position, Vector3.one * 0.5f);
+
+                        // 傾斜方向を表示
+                        Vector3 direction = slope.GetSlopeDirection();
+                        Gizmos.DrawLine(slope.transform.position, slope.transform.position + direction * 2f);
+                    }
+                }
+            }
         }
 
         // Stage statistics for debugging and analytics
@@ -1693,6 +2065,25 @@ namespace GravityFlipLab.Stage
         {
             // This can be called when a checkpoint is activated
             Debug.Log($"StageManager: Checkpoint activated notification: {checkpointPosition}");
+        }
+
+        // 傾斜統計情報
+        [System.Serializable]
+        public class SlopeStatistics
+        {
+            public int totalSlopes;
+            public int normalSlopes;
+            public int steepSlopes;
+            public int gentleSlopes;
+            public int accelerationSlopes;
+            public int decelerationSlopes;
+
+            public override string ToString()
+            {
+                return $"Slope Stats - Total: {totalSlopes}, Normal: {normalSlopes}, " +
+                       $"Steep: {steepSlopes}, Gentle: {gentleSlopes}, " +
+                       $"Acceleration: {accelerationSlopes}, Deceleration: {decelerationSlopes}";
+            }
         }
     }
     #endregion

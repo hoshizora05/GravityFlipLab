@@ -49,11 +49,11 @@ MonoBehaviour:
     tintColor: {r: 1, g: 1, b: 1, a: 1}
   obstacles:
   - type: 0
-    position: {x: 20, y: -6.74, z: 0}
+    position: {x: 40, y: -6.74, z: 0}
     rotation: {x: 0, y: 0, z: 0}
     scale: {x: 1, y: 1, z: 1}
   - type: 1
-    position: {x: 20, y: 0, z: 0}
+    position: {x: 50, y: -6.74, z: 0}
     rotation: {x: 0, y: 0, z: 0}
     scale: {x: 1, y: 1, z: 1}
   collectibles:
@@ -335,3 +335,14 @@ MonoBehaviour:
     m_RotationOrder: 4
   enableProceduralGeneration: 0
   proceduralSeed: 0
+  slopes:
+  - type: 0
+    position: {x: 20, y: -6.74, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    slopeAngle: 30
+    slopeDirection: 0
+    slopeLength: 5
+    speedMultiplier: 1.2
+    affectGravity: 1
+    gravityRedirection: 0.5
