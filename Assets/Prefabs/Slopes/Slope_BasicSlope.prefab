@@ -16,7 +16,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1726509931390645842
 Transform:
   m_ObjectHideFlags: 0
@@ -148,6 +148,7 @@ MonoBehaviour:
     showDebugGizmos: 1
     gizmoColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
     rotateVisuals: 1
+    matchColliderShape: 1
   affectedLayers:
     serializedVersion: 2
     m_Bits: 4096

@@ -37,6 +37,7 @@ namespace GravityFlipLab.Stage
         public bool showDebugGizmos = true;
         public Color gizmoColor = Color.yellow;
         public bool rotateVisuals = true;
+        public bool matchColliderShape = true;
     }
 
     public enum SlopeDirection
@@ -68,6 +69,11 @@ namespace GravityFlipLab.Stage
         private SlopeSettings lastSettings;
         private bool needsColliderUpdate = true;
 
+        // Visual mesh for custom shape rendering
+        private Mesh slopeMesh;
+        private MeshFilter meshFilter;
+        private MeshRenderer meshRenderer;
+
         // Events
         public System.Action<GameObject> OnObjectEnterSlope;
         public System.Action<GameObject> OnObjectExitSlope;
@@ -94,6 +100,9 @@ namespace GravityFlipLab.Stage
             // SpriteRendererの取得/追加
             if (slopeRenderer == null)
                 slopeRenderer = GetComponent<SpriteRenderer>();
+
+            // 3Dメッシュレンダリング用コンポーネントの初期化
+            InitializeMeshComponents();
 
             // 既存のコライダーをチェック
             var existingBoxColliders = GetComponents<BoxCollider2D>();
@@ -127,6 +136,36 @@ namespace GravityFlipLab.Stage
 
             // 重複するコライダーを削除
             CleanupDuplicateColliders(existingBoxColliders, existingPolygonColliders);
+        }
+
+        /// <summary>
+        /// 3Dメッシュレンダリング用コンポーネントの初期化
+        /// </summary>
+        private void InitializeMeshComponents()
+        {
+            if (slopeSettings.matchColliderShape)
+            {
+                // MeshFilterとMeshRendererがない場合は追加
+                meshFilter = GetComponent<MeshFilter>();
+                if (meshFilter == null)
+                    meshFilter = gameObject.AddComponent<MeshFilter>();
+
+                meshRenderer = GetComponent<MeshRenderer>();
+                if (meshRenderer == null)
+                    meshRenderer = gameObject.AddComponent<MeshRenderer>();
+
+                // デフォルトマテリアルの設定
+                if (meshRenderer.material == null)
+                {
+                    // 2D用のデフォルトマテリアルを使用
+                    meshRenderer.material = new Material(Shader.Find("Sprites/Default"));
+                    meshRenderer.material.color = slopeSettings.gizmoColor;
+                }
+
+                // 描画順序の設定（2D環境での適切な描画）
+                meshRenderer.sortingLayerName = "Default";
+                meshRenderer.sortingOrder = 0;
+            }
         }
 
         /// <summary>
@@ -171,7 +210,8 @@ namespace GravityFlipLab.Stage
                 slopeDirection = slopeSettings.slopeDirection,
                 slopeLength = slopeSettings.slopeLength,
                 baseThickness = slopeSettings.baseThickness,
-                triggerSizeMultiplier = slopeSettings.triggerSizeMultiplier
+                triggerSizeMultiplier = slopeSettings.triggerSizeMultiplier,
+                matchColliderShape = slopeSettings.matchColliderShape
             };
         }
 
@@ -205,6 +245,7 @@ namespace GravityFlipLab.Stage
             // 設定変更チェック
             CheckForSettingsChanges();
         }
+
         private void TestCollisionManually()
         {
             GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -236,7 +277,8 @@ namespace GravityFlipLab.Stage
                    lastSettings.slopeDirection != slopeSettings.slopeDirection ||
                    !Mathf.Approximately(lastSettings.slopeLength, slopeSettings.slopeLength) ||
                    !Mathf.Approximately(lastSettings.baseThickness, slopeSettings.baseThickness) ||
-                   lastSettings.triggerSizeMultiplier != slopeSettings.triggerSizeMultiplier;
+                   lastSettings.triggerSizeMultiplier != slopeSettings.triggerSizeMultiplier ||
+                   lastSettings.matchColliderShape != slopeSettings.matchColliderShape;
         }
 
         /// <summary>
@@ -254,6 +296,11 @@ namespace GravityFlipLab.Stage
             if (slopeSettings.rotateVisuals)
             {
                 UpdateVisualRotation();
+            }
+
+            if (slopeSettings.matchColliderShape)
+            {
+                UpdateVisualShape();
             }
         }
 
@@ -370,6 +417,9 @@ namespace GravityFlipLab.Stage
             return points.ToArray();
         }
 
+        /// <summary>
+        /// ビジュアルの回転更新（SpriteRendererのtransformのみ）
+        /// </summary>
         private void UpdateVisualRotation()
         {
             if (slopeRenderer != null)
@@ -378,8 +428,141 @@ namespace GravityFlipLab.Stage
                     ? slopeSettings.slopeAngle
                     : -slopeSettings.slopeAngle;
 
-                transform.rotation = Quaternion.Euler(0, 0, rotationAngle);
+                // SpriteRendererのtransformのみを回転（メインのtransformは変更しない）
+                slopeRenderer.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
             }
+        }
+
+        /// <summary>
+        /// ビジュアル形状をPhysicsColliderに合わせて更新
+        /// </summary>
+        private void UpdateVisualShape()
+        {
+            if (!slopeSettings.matchColliderShape || physicsCollider == null) return;
+
+            // SpriteRendererを使用する場合の形状更新
+            if (slopeRenderer != null)
+            {
+                UpdateSpriteShape();
+            }
+
+            // MeshRendererを使用する場合の形状更新
+            if (meshFilter != null && meshRenderer != null)
+            {
+                UpdateMeshShape();
+            }
+        }
+
+        /// <summary>
+        /// スプライトの形状をコライダーに合わせて更新
+        /// </summary>
+        private void UpdateSpriteShape()
+        {
+            if (slopeRenderer == null || physicsCollider == null) return;
+
+            // 基本的なスケール調整でコライダーに近い形状にする
+            float length = slopeSettings.slopeLength;
+            float angle = slopeSettings.slopeAngle * Mathf.Deg2Rad;
+            float height = Mathf.Tan(angle) * length;
+
+            // スプライトのスケールを傾斜の寸法に合わせて調整
+            Vector3 scale = new Vector3(
+                length / (slopeRenderer.sprite?.bounds.size.x ?? 1f),
+                Mathf.Max(height, slopeSettings.baseThickness) / (slopeRenderer.sprite?.bounds.size.y ?? 1f),
+                1f
+            );
+
+            slopeRenderer.transform.localScale = scale;
+
+            // 位置調整（傾斜の中心に配置）
+            float yOffset = slopeSettings.slopeDirection == SlopeDirection.Ascending
+                ? height * 0.25f
+                : height * 0.25f;
+
+            slopeRenderer.transform.localPosition = new Vector3(0f, yOffset, 0f);
+        }
+
+        /// <summary>
+        /// メッシュの形状をコライダーに合わせて更新
+        /// </summary>
+        private void UpdateMeshShape()
+        {
+            if (meshFilter == null || physicsCollider == null || physicsCollider.points == null) return;
+
+            // PhysicsColliderのポイントからメッシュを生成
+            Vector2[] colliderPoints = physicsCollider.points;
+            if (colliderPoints.Length < 3) return;
+
+            // メッシュの作成
+            if (slopeMesh == null)
+            {
+                slopeMesh = new Mesh();
+                slopeMesh.name = "SlopeMesh";
+            }
+
+            // 2Dポイントを3D頂点に変換
+            Vector3[] vertices = new Vector3[colliderPoints.Length];
+            for (int i = 0; i < colliderPoints.Length; i++)
+            {
+                vertices[i] = new Vector3(colliderPoints[i].x, colliderPoints[i].y, 0f);
+            }
+
+            // 三角形の生成（fan triangulation）
+            List<int> triangles = new List<int>();
+            for (int i = 1; i < vertices.Length - 1; i++)
+            {
+                triangles.Add(0);
+                triangles.Add(i);
+                triangles.Add(i + 1);
+            }
+
+            // UV座標の計算
+            Vector2[] uvs = new Vector2[vertices.Length];
+            Bounds bounds = CalculateBounds(vertices);
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                uvs[i] = new Vector2(
+                    (vertices[i].x - bounds.min.x) / bounds.size.x,
+                    (vertices[i].y - bounds.min.y) / bounds.size.y
+                );
+            }
+
+            // メッシュの更新
+            slopeMesh.Clear();
+            slopeMesh.vertices = vertices;
+            slopeMesh.triangles = triangles.ToArray();
+            slopeMesh.uv = uvs;
+            slopeMesh.RecalculateNormals();
+            slopeMesh.RecalculateBounds();
+
+            meshFilter.mesh = slopeMesh;
+
+            // マテリアルの色更新
+            if (meshRenderer.material != null)
+            {
+                meshRenderer.material.color = slopeSettings.gizmoColor;
+            }
+        }
+
+        /// <summary>
+        /// 頂点配列から境界を計算
+        /// </summary>
+        private Bounds CalculateBounds(Vector3[] vertices)
+        {
+            if (vertices.Length == 0) return new Bounds();
+
+            Vector3 min = vertices[0];
+            Vector3 max = vertices[0];
+
+            foreach (var vertex in vertices)
+            {
+                min = Vector3.Min(min, vertex);
+                max = Vector3.Max(max, vertex);
+            }
+
+            Vector3 center = (min + max) * 0.5f;
+            Vector3 size = max - min;
+            return new Bounds(center, size);
         }
 
         private void ApplySlopePhysics()
@@ -629,6 +812,28 @@ namespace GravityFlipLab.Stage
             slopeSettings.autoUpdateColliders = enable;
         }
 
+        // Visual configuration methods
+        public void SetMatchColliderShape(bool match)
+        {
+            slopeSettings.matchColliderShape = match;
+            UpdateSlope();
+        }
+
+        public void SetVisualRotation(bool rotate)
+        {
+            slopeSettings.rotateVisuals = rotate;
+            UpdateSlope();
+        }
+
+        public void SetGizmoColor(Color color)
+        {
+            slopeSettings.gizmoColor = color;
+            if (meshRenderer != null && meshRenderer.material != null)
+            {
+                meshRenderer.material.color = color;
+            }
+        }
+
         // Debug and performance methods
         public void RefreshColliders()
         {
@@ -723,6 +928,7 @@ namespace GravityFlipLab.Stage
             DrawDetailedDebugInfo();
             DrawAffectedObjects();
             DrawTheoreticalSlope();
+            DrawVisualAlignment();
         }
 
         private void DrawDetailedDebugInfo()
@@ -747,7 +953,8 @@ namespace GravityFlipLab.Stage
                 $"Slope: {slopeSettings.slopeAngle:F1}° {slopeSettings.slopeDirection}\n" +
                 $"Length: {slopeSettings.slopeLength:F1}m\n" +
                 $"Height: {height:F1}m\n" +
-                $"Objects: {objectsOnSlope.Count}");
+                $"Objects: {objectsOnSlope.Count}\n" +
+                $"Visual Match: {slopeSettings.matchColliderShape}");
 #endif
         }
 
@@ -799,6 +1006,28 @@ namespace GravityFlipLab.Stage
             Gizmos.DrawLine(start + thicknessOffset, end + thicknessOffset);
         }
 
+        private void DrawVisualAlignment()
+        {
+            if (!slopeSettings.matchColliderShape) return;
+
+            // ビジュアルとコライダーの整合性を表示
+            Gizmos.color = Color.magenta;
+
+            if (slopeRenderer != null)
+            {
+                // SpriteRendererの境界を表示
+                Bounds spriteBounds = slopeRenderer.bounds;
+                Gizmos.DrawWireCube(spriteBounds.center, spriteBounds.size);
+            }
+
+            if (meshRenderer != null)
+            {
+                // MeshRendererの境界を表示
+                Bounds meshBounds = meshRenderer.bounds;
+                Gizmos.DrawWireCube(meshBounds.center, meshBounds.size);
+            }
+        }
+
         // エディター用の検証メソッド
         private void OnValidate()
         {
@@ -838,7 +1067,8 @@ namespace GravityFlipLab.Stage
                 currentObjectCount = objectsOnSlope.Count,
                 triggerColliderSize = triggerCollider?.size ?? Vector2.zero,
                 physicsColliderPointCount = physicsCollider?.points?.Length ?? 0,
-                isValid = ValidateColliderSetup()
+                isValid = ValidateColliderSetup(),
+                matchColliderShape = slopeSettings.matchColliderShape
             };
         }
 
@@ -850,6 +1080,15 @@ namespace GravityFlipLab.Stage
             {
                 removeQueue.Dequeue();
             }
+
+            // メッシュのクリーンアップ
+            if (slopeMesh != null)
+            {
+                if (Application.isEditor)
+                    DestroyImmediate(slopeMesh);
+                else
+                    Destroy(slopeMesh);
+            }
         }
 
         // パフォーマンス監視
@@ -860,7 +1099,9 @@ namespace GravityFlipLab.Stage
                      $"Trigger size: {triggerCollider?.size}\n" +
                      $"Polygon points: {physicsCollider?.points?.Length}\n" +
                      $"Auto-update enabled: {slopeSettings.autoUpdateColliders}\n" +
-                     $"Physics effects enabled: {slopeSettings.enablePhysicsEffects}");
+                     $"Physics effects enabled: {slopeSettings.enablePhysicsEffects}\n" +
+                     $"Match collider shape: {slopeSettings.matchColliderShape}\n" +
+                     $"Has custom mesh: {slopeMesh != null}");
         }
 
         // 高度な設定メソッド
@@ -868,6 +1109,7 @@ namespace GravityFlipLab.Stage
         {
             slopeSettings.autoUpdateColliders = false;
             slopeSettings.showDebugGizmos = false;
+            slopeSettings.matchColliderShape = false;
             enabled = !slopeSettings.enablePhysicsEffects;
         }
 
@@ -875,6 +1117,7 @@ namespace GravityFlipLab.Stage
         {
             slopeSettings.autoUpdateColliders = true;
             slopeSettings.showDebugGizmos = true;
+            slopeSettings.matchColliderShape = true;
             enabled = true;
         }
 
@@ -901,6 +1144,67 @@ namespace GravityFlipLab.Stage
             Vector3 size = triggerCollider.size;
             return new Bounds(center, size);
         }
+
+        // ビジュアル関連の追加メソッド
+        public void ResetVisualTransform()
+        {
+            if (slopeRenderer != null)
+            {
+                slopeRenderer.transform.localRotation = Quaternion.identity;
+                slopeRenderer.transform.localScale = Vector3.one;
+                slopeRenderer.transform.localPosition = Vector3.zero;
+            }
+        }
+
+        public void ForceVisualUpdate()
+        {
+            UpdateVisualRotation();
+            UpdateVisualShape();
+        }
+
+        public bool HasCustomMesh()
+        {
+            return slopeMesh != null && meshFilter != null && meshRenderer != null;
+        }
+
+        public void CreateCustomMesh()
+        {
+            if (meshFilter == null || meshRenderer == null)
+            {
+                InitializeMeshComponents();
+            }
+            UpdateMeshShape();
+        }
+
+        public void RemoveCustomMesh()
+        {
+            if (meshFilter != null)
+            {
+                if (Application.isEditor)
+                    DestroyImmediate(meshFilter);
+                else
+                    Destroy(meshFilter);
+                meshFilter = null;
+            }
+
+            if (meshRenderer != null)
+            {
+                if (Application.isEditor)
+                    DestroyImmediate(meshRenderer);
+                else
+                    Destroy(meshRenderer);
+                meshRenderer = null;
+            }
+
+            if (slopeMesh != null)
+            {
+                if (Application.isEditor)
+                    DestroyImmediate(slopeMesh);
+                else
+                    Destroy(slopeMesh);
+                slopeMesh = null;
+            }
+        }
     }
 
     /// <summary>
@@ -917,11 +1221,13 @@ namespace GravityFlipLab.Stage
         public Vector2 triggerColliderSize;
         public int physicsColliderPointCount;
         public bool isValid;
+        public bool matchColliderShape;
 
         public override string ToString()
         {
             return $"Slope Stats - Angle: {slopeAngle:F1}°, Direction: {slopeDirection}, " +
-                   $"Length: {slopeLength:F1}m, Objects: {currentObjectCount}, Valid: {isValid}";
+                   $"Length: {slopeLength:F1}m, Objects: {currentObjectCount}, Valid: {isValid}, " +
+                   $"Match Shape: {matchColliderShape}";
         }
     }
 
@@ -971,6 +1277,34 @@ namespace GravityFlipLab.Stage
             var settings = slope.GetSlopeSettings();
             settings.slopeLength *= factor;
             slope.SetSlopeSettings(settings);
+        }
+
+        public static void SetSlopeVisualization(this SlopeObject slope, bool useSprite, bool useCustomMesh)
+        {
+            var settings = slope.GetSlopeSettings();
+            settings.matchColliderShape = useCustomMesh;
+            slope.SetSlopeSettings(settings);
+
+            if (useCustomMesh && !slope.HasCustomMesh())
+            {
+                slope.CreateCustomMesh();
+            }
+            else if (!useCustomMesh && slope.HasCustomMesh())
+            {
+                slope.RemoveCustomMesh();
+            }
+        }
+
+        public static void AlignVisualToCollider(this SlopeObject slope)
+        {
+            slope.SetMatchColliderShape(true);
+            slope.ForceVisualUpdate();
+        }
+
+        public static void ResetVisualToDefault(this SlopeObject slope)
+        {
+            slope.SetMatchColliderShape(false);
+            slope.ResetVisualTransform();
         }
     }
 }
