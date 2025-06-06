@@ -80,6 +80,15 @@ namespace GravityFlipLab.Player
         private bool isRespawnHandled = false; // リスポーン処理が他システムで処理済みかフラグ
         private Coroutine respawnCoroutine; // リスポーンコルーチンの参照
 
+        [Header("Fall Speed Control")]
+        public bool enableFallSpeedControl = true;
+        public float fallSpeedAcceleration = 2f;
+        public AnimationCurve fallSpeedCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
+        private float currentFallTime = 0f;
+        private bool isFalling = false;
+        private Vector2 fallDirection = Vector2.down;
+
         // 初期設定値を保存するための構造体
         [System.Serializable]
         public struct GravityConfiguration
@@ -408,16 +417,21 @@ namespace GravityFlipLab.Player
                 velocity *= stats.airDrag;
             }
 
-            // Limit maximum velocity
+            // 落下速度制御を適用（既存の最大速度制限より優先）
+            if (enableFallSpeedControl)
+            {
+                ApplyFallSpeedControl();
+                return; // 落下速度制御が有効な場合は、そちらで速度制限も行う
+            }
+
+            // フォールバック：従来の最大速度制限
             if (velocity.magnitude > stats.maxVelocityMagnitude)
             {
                 velocity = velocity.normalized * stats.maxVelocityMagnitude;
             }
 
-            // Limit fall speed
+            // フォールバック：従来の落下速度制限
             float gravityDir = (float)gravityDirection;
-            float maxFall = stats.maxFallSpeed * gravityDir;
-
             if (gravityDirection == GravityDirection.Down)
             {
                 velocity.y = Mathf.Max(velocity.y, -stats.maxFallSpeed);
@@ -895,6 +909,141 @@ namespace GravityFlipLab.Player
                 Respawn();
                 Debug.LogError("Emergency position reset applied");
             }
+        }
+        private void ApplyFallSpeedControl()
+        {
+            if (!enableFallSpeedControl || !isAlive) return;
+
+            Vector3 velocity = rb2d.linearVelocity;
+            Vector2 currentGravityDir = GetCurrentGravityDirection();
+
+            // 落下状態の判定
+            bool wasFalling = isFalling;
+            isFalling = IsFalling(velocity, currentGravityDir);
+
+            if (isFalling)
+            {
+                if (!wasFalling)
+                {
+                    // 落下開始
+                    OnFallStart();
+                }
+
+                // 落下時間の更新
+                currentFallTime += Time.fixedDeltaTime;
+
+                // 落下速度の制御
+                ApplyFallSpeedLimits(ref velocity, currentGravityDir);
+            }
+            else
+            {
+                if (wasFalling)
+                {
+                    // 落下終了
+                    OnFallEnd();
+                }
+                currentFallTime = 0f;
+            }
+
+            rb2d.linearVelocity = velocity;
+        }
+
+        private bool IsFalling(Vector2 velocity, Vector2 gravityDir)
+        {
+            // 重力方向への速度成分を確認
+            float gravityVelocity = Vector2.Dot(velocity, gravityDir);
+
+            // 地面に接触していない且つ重力方向に一定速度以上で移動している
+            return !isGrounded && gravityVelocity > 1f;
+        }
+
+        private void ApplyFallSpeedLimits(ref Vector3 velocity, Vector2 gravityDir)
+        {
+            // 重力方向の速度成分を取得
+            float gravityVelocity = Vector2.Dot(velocity, gravityDir);
+
+            // 段階的な落下速度制御
+            float targetFallSpeed = CalculateTargetFallSpeed();
+            float maxAllowedFallSpeed = stats.maxFallSpeed;
+
+            // 目標落下速度への補間
+            if (gravityVelocity < targetFallSpeed)
+            {
+                // まだ目標速度に達していない場合は加速
+                float acceleration = fallSpeedAcceleration * Time.fixedDeltaTime;
+                gravityVelocity = Mathf.Min(gravityVelocity + acceleration, targetFallSpeed);
+            }
+            else if (gravityVelocity > maxAllowedFallSpeed)
+            {
+                // 最大速度を超えている場合は制限
+                gravityVelocity = maxAllowedFallSpeed;
+            }
+
+            // 速度を再構成
+            Vector3 gravityVelocityVector = gravityDir * gravityVelocity;
+            Vector3 lateralVelocity = velocity - Vector3.Project(velocity, gravityDir);
+            velocity = lateralVelocity + gravityVelocityVector;
+
+            if (debugMode)
+            {
+                Debug.Log($"Fall Speed Control - Target: {targetFallSpeed:F2}, Current: {gravityVelocity:F2}, Max: {maxAllowedFallSpeed:F2}");
+            }
+        }
+
+        private float CalculateTargetFallSpeed()
+        {
+            // 落下時間に基づく段階的速度制御
+            float normalizedTime = Mathf.Clamp01(currentFallTime / 0.5f); // 0.5秒で最大速度に到達
+            float curveValue = fallSpeedCurve.Evaluate(normalizedTime);
+
+            return Mathf.Lerp(0f, stats.fallSpeed, curveValue);
+        }
+
+        private Vector2 GetCurrentGravityDirection()
+        {
+            if (gravityAffected != null)
+            {
+                Vector2 currentGravity = gravityAffected.GetCurrentGravity();
+                return currentGravity.magnitude > 0.1f ? currentGravity.normalized : Vector2.down;
+            }
+
+            return gravityDirection == GravityDirection.Down ? Vector2.down : Vector2.up;
+        }
+
+        private void OnFallStart()
+        {
+            currentFallTime = 0f;
+            fallDirection = GetCurrentGravityDirection();
+
+            //if (playerAnimation != null)
+            //    playerAnimation.OnFallStart();
+
+            if (debugMode)
+                Debug.Log("Fall started");
+        }
+
+        private void OnFallEnd()
+        {
+            currentFallTime = 0f;
+
+            //if (playerAnimation != null)
+            //    playerAnimation.OnFallEnd();
+
+            if (debugMode)
+                Debug.Log($"Fall ended after {currentFallTime:F2} seconds");
+        }
+        // Public API methods
+        public bool IsFalling() => isFalling;
+        public float GetCurrentFallTime() => currentFallTime;
+        public float GetCurrentFallSpeed()
+        {
+            Vector2 gravityDir = GetCurrentGravityDirection();
+            return Vector2.Dot(rb2d.linearVelocity, gravityDir);
+        }
+
+        public void SetFallSpeedControl(bool enabled)
+        {
+            enableFallSpeedControl = enabled;
         }
 
         private void OnDrawGizmos()
