@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -42,6 +42,13 @@ namespace AddressableManagementSystem
                 return _instance;
             }
         }
+        //[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        //static void _ForceEarlyInitForDebug()
+        //{
+        //    Debug.Log("### EARLY Addressables.InitializeAsync() ###");
+        //    var handle = Addressables.InitializeAsync();
+        //    handle.Completed += h => Debug.Log($"### EARLY Init Status: {h.Status} ###");
+        //}
 
         private void Awake()
         {
@@ -256,21 +263,17 @@ namespace AddressableManagementSystem
             _isInitializing = true;
             Log("Initializing Addressable Resource Manager");
 
+            // â˜… autoReleaseHandle=false ã§ãƒãƒ³ãƒ‰ãƒ«ã‚’ä¿æŒã™ã‚‹
+            var initOperation = Addressables.InitializeAsync(false);
             try
             {
-                // Initialize Addressables
-                var initOperation = Addressables.InitializeAsync();
-                await initOperation.Task;
 
-                if (initOperation.Status == AsyncOperationStatus.Failed)
-                {
-                    LogError("Failed to initialize Addressables: " + initOperation.OperationException);
-                    _isInitializing = false;
-                    return false;
-                }
+                // ã“ã“ã§ IResourceLocator ãŒè¿”ã£ã¦ãã‚‹
+                var locator = await initOperation.Task;
 
+                // è¿½åŠ ã®ã‚¨ãƒ©ãƒ¼ãƒã‚§ãƒƒã‚¯ã¯ locator == null ã§ååˆ†
                 _isInitialized = true;
-                Log("Addressable Resource Manager initialized successfully");
+                Debug.Log("Addressables åˆæœŸåŒ–æˆåŠŸ");
 
                 StartCoroutine(MemoryMonitoringRoutine());
 
@@ -278,12 +281,14 @@ namespace AddressableManagementSystem
             }
             catch (Exception e)
             {
-                LogError("Error initializing Addressables: " + e.Message);
+                Debug.LogError($"Addressables åˆæœŸåŒ–å¤±æ•—: {e.Message}");
                 _isInitialized = false;
                 return false;
             }
             finally
             {
+                // Completed å¾Œã«å¿…ãšè§£æ”¾
+                Addressables.Release(initOperation);
                 _isInitializing = false;
             }
         }
@@ -345,25 +350,65 @@ namespace AddressableManagementSystem
                 return existingOperation.Convert<T>();
             }
 
-            // Create a new load request and add it to the queue
-            var request = new LoadRequest<T>
+            AsyncOperationHandle<T> handle;
+
+            try
             {
-                Key = key,
-                Priority = priority,
-                Callback = callback,
-                StartTime = Time.realtimeSinceStartup
-            };
+                // ç›´æ¥Addressablesã‚’ä½¿ç”¨ã—ã¦ãƒ­ãƒ¼ãƒ‰
+                handle = Addressables.LoadAssetAsync<T>(key);
 
-            _assetPriorities[key] = priority;
-            IncrementReferenceCounter(key);
+                // ã‚¢ã‚¯ãƒ†ã‚£ãƒ–ã‚ªãƒšãƒ¬ãƒ¼ã‚·ãƒ§ãƒ³ã«è¿½åŠ 
+                _activeOperations[key] = handle;
 
-            _loadQueue.Enqueue(request);
+                // ãƒªãƒ•ã‚¡ãƒ¬ãƒ³ã‚¹ã‚«ã‚¦ãƒ³ã‚¿ã‚’å¢—ã‚„ã™
+                IncrementReferenceCounter(key);
 
-            if (!_isProcessingQueue)
-                StartCoroutine(ProcessLoadQueue());
+                // å„ªå…ˆåº¦ã‚’è¨˜éŒ²
+                _assetPriorities[key] = priority;
 
-            // Return a placeholder handle that will be properly linked when the asset loads
-            return Addressables.ResourceManager.CreateCompletedOperation<T>(default, null);
+                // é–‹å§‹æ™‚é–“ã‚’è¨˜éŒ²
+                _lastAccessTimes[key] = Time.realtimeSinceStartup;
+
+                // å®Œäº†æ™‚ã®ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯ã‚’è¨­å®š
+                handle.Completed += (operation) =>
+                {
+                    if (operation.Status == AsyncOperationStatus.Succeeded)
+                    {
+                        // ãƒ­ãƒ¼ãƒ‰ã‚¿ã‚¤ãƒ è¨ˆç®—
+                        float loadTime = Time.realtimeSinceStartup - _lastAccessTimes[key];
+                        _loadTimings[key] = loadTime;
+
+                        if (!_loadTimeHistory.ContainsKey(key))
+                            _loadTimeHistory[key] = new List<float>();
+
+                        _loadTimeHistory[key].Add(loadTime);
+
+                        // ã‚­ãƒ£ãƒƒã‚·ãƒ¥ã«è¿½åŠ 
+                        _loadedAssets[key] = operation.Result;
+                        _lastAccessTimes[key] = Time.realtimeSinceStartup;
+
+                        Log($"Successfully loaded asset: {key} in {loadTime:F2} seconds");
+
+                        // ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯å®Ÿè¡Œ
+                        callback?.Invoke(operation.Result);
+                    }
+                    else
+                    {
+                        LogError($"Failed to load asset: {key} - {operation.OperationException}");
+                        DecrementReferenceCounter(key);
+                        _activeOperations.Remove(key);
+                    }
+                };
+
+                return handle;
+            }
+            catch (System.Exception e)
+            {
+                LogError($"Exception starting load for asset {key}: {e.Message}");
+
+                // ã‚¨ãƒ©ãƒ¼æ™‚ã¯å¤±æ•—ã—ãŸãƒãƒ³ãƒ‰ãƒ«ã‚’è¿”ã™
+                return Addressables.ResourceManager.CreateCompletedOperation<T>(default, e.Message);
+            }
         }
 
         /// <summary>
@@ -371,38 +416,38 @@ namespace AddressableManagementSystem
         /// </summary>
         /// <param name="key">Addressable key for the scene</param>
         /// <param name="activateOnLoad">Whether to activate the scene immediately after loading</param>
-        /// <param name="priority">Loading priority (higher values are loaded sooner)</param> // š priority ƒpƒ‰ƒ[ƒ^‚ğ’Ç‰Á
+        /// <param name="priority">Loading priority (higher values are loaded sooner)</param> // â˜… priority ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’è¿½åŠ 
         /// <returns>AsyncOperationHandle for the scene loading operation</returns>
-        public AsyncOperationHandle<SceneInstance> LoadSceneAsync(string key, bool activateOnLoad = true, int priority = 100) // š priority ˆø”‚ğ’Ç‰Á
+        public AsyncOperationHandle<SceneInstance> LoadSceneAsync(string key, bool activateOnLoad = true, int priority = 100) // â˜… priority å¼•æ•°ã‚’è¿½åŠ 
         {
             if (!_isInitialized && !_isInitializing)
             {
                 LogWarning("Attempting to load scene before initialization. Auto-initializing...");
-                _ = Initialize(); // Initialize ‚ğ”ñ“¯Šú‚ÅŠJn‚µAŠ®—¹‚ğ‘Ò‚½‚È‚¢
+                _ = Initialize(); // Initialize ã‚’éåŒæœŸã§é–‹å§‹ã—ã€å®Œäº†ã‚’å¾…ãŸãªã„
             }
 
-            Log($"Loading scene: {key}, activateOnLoad: {activateOnLoad}, priority: {priority}"); // š ƒƒO‚É priority ‚ğ’Ç‰Á
+            Log($"Loading scene: {key}, activateOnLoad: {activateOnLoad}, priority: {priority}"); // â˜… ãƒ­ã‚°ã« priority ã‚’è¿½åŠ 
 
             var loadSceneMode = LoadSceneMode.Additive;
-            // ššš C³‰ÓŠ ššš
-            // ActivationMode •Ï”‚Í•s—v‚È‚Ì‚Åíœ
-            // Addressables.LoadSceneAsync ‚Ì‘æ3ˆø”‚É activateOnLoad ‚ğ“n‚µA‘æ4ˆø”‚É priority ‚ğ“n‚·
+            // â˜…â˜…â˜… ä¿®æ­£ç®‡æ‰€ â˜…â˜…â˜…
+            // ActivationMode å¤‰æ•°ã¯ä¸è¦ãªã®ã§å‰Šé™¤
+            // Addressables.LoadSceneAsync ã®ç¬¬3å¼•æ•°ã« activateOnLoad ã‚’æ¸¡ã—ã€ç¬¬4å¼•æ•°ã« priority ã‚’æ¸¡ã™
             var operation = Addressables.LoadSceneAsync(key, loadSceneMode, activateOnLoad, priority);
-            // šššššššššššš
+            // â˜…â˜…â˜…â˜…â˜…â˜…â˜…â˜…â˜…â˜…â˜…â˜…
 
-            // Track the operation - ƒL[‚Å’ÇÕ‚·‚éê‡AƒV[ƒ“‚Íd•¡‚µ‚Äƒ[ƒh‚Å‚«‚È‚¢“_‚É’ˆÓ‚ª•K—v
-            // ˆêˆÓ‚ÈƒL[‚Ü‚½‚Íƒnƒ“ƒhƒ‹©‘Ì‚ğŠÇ—‚·‚é•û–@‚ğŒŸ“¢
-            // ‚±‚±‚Å‚ÍƒL[‚Å’Pƒ‚É’ÇÕ‚·‚éÀ‘•‚É‚È‚Á‚Ä‚¢‚é
-            _activeOperations[key] = operation; // ã‘‚«‚³‚ê‚é‰Â”\«‚ ‚è
+            // Track the operation - ã‚­ãƒ¼ã§è¿½è·¡ã™ã‚‹å ´åˆã€ã‚·ãƒ¼ãƒ³ã¯é‡è¤‡ã—ã¦ãƒ­ãƒ¼ãƒ‰ã§ããªã„ç‚¹ã«æ³¨æ„ãŒå¿…è¦
+            // ä¸€æ„ãªã‚­ãƒ¼ã¾ãŸã¯ãƒãƒ³ãƒ‰ãƒ«è‡ªä½“ã‚’ç®¡ç†ã™ã‚‹æ–¹æ³•ã‚’æ¤œè¨
+            // ã“ã“ã§ã¯ã‚­ãƒ¼ã§å˜ç´”ã«è¿½è·¡ã™ã‚‹å®Ÿè£…ã«ãªã£ã¦ã„ã‚‹
+            _activeOperations[key] = operation; // ä¸Šæ›¸ãã•ã‚Œã‚‹å¯èƒ½æ€§ã‚ã‚Š
             IncrementReferenceCounter(key);
 
             // Set up completion callback to update tracking
             operation.Completed += handle =>
             {
-                // š Š®—¹‚Ìƒnƒ“ƒhƒ‹‰ğ•ú‚ÆQÆƒJƒEƒ“ƒgŠÇ—‚ğŒ©’¼‚µ
+                // â˜… å®Œäº†æ™‚ã®ãƒãƒ³ãƒ‰ãƒ«è§£æ”¾ã¨å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆç®¡ç†ã‚’è¦‹ç›´ã—
                 if (handle.Status == AsyncOperationStatus.Succeeded)
                 {
-                    var startTime = _lastAccessTimes.GetValueOrDefault(key, Time.realtimeSinceStartup); // ŠJnŠÔ‚ğ‹L˜^‚Å‚«‚Ä‚¢‚È‚©‚Á‚½–â‘è‚É‘Îˆ
+                    var startTime = _lastAccessTimes.GetValueOrDefault(key, Time.realtimeSinceStartup); // é–‹å§‹æ™‚é–“ã‚’è¨˜éŒ²ã§ãã¦ã„ãªã‹ã£ãŸå•é¡Œã«å¯¾å‡¦
                     var loadTime = Time.realtimeSinceStartup - startTime;
                     _loadTimings[key] = loadTime;
 
@@ -411,40 +456,40 @@ namespace AddressableManagementSystem
 
                     _loadTimeHistory[key].Add(loadTime);
 
-                    // š ¬Œ÷‚àÅŒã‚ÌƒAƒNƒZƒXŠÔ‚ğXV
+                    // â˜… æˆåŠŸæ™‚ã‚‚æœ€å¾Œã®ã‚¢ã‚¯ã‚»ã‚¹æ™‚é–“ã‚’æ›´æ–°
                     _lastAccessTimes[key] = Time.realtimeSinceStartup;
 
                     Log($"Scene loaded successfully: {key} (Scene Name: {handle.Result.Scene.name}) in {loadTime:F2} seconds");
 
-                    // š ƒV[ƒ“‚ªƒ[ƒh‚³‚ê‚½‚±‚Æ‚ğ¦‚·‚½‚ß‚É _loadedAssets ‚É SceneInstance ‚ğ’Ç‰Á‚·‚é (•K—v‚Å‚ ‚ê‚Î)
+                    // â˜… ã‚·ãƒ¼ãƒ³ãŒãƒ­ãƒ¼ãƒ‰ã•ã‚ŒãŸã“ã¨ã‚’ç¤ºã™ãŸã‚ã« _loadedAssets ã« SceneInstance ã‚’è¿½åŠ ã™ã‚‹ (å¿…è¦ã§ã‚ã‚Œã°)
                     _loadedAssets[key] = handle;
 
                 }
                 else
                 {
                     LogError($"Failed to load scene: {key} - {handle.OperationException}");
-                    DecrementReferenceCounter(key); // ¸”s‚ÉQÆƒJƒEƒ“ƒg‚ğŒ¸‚ç‚·
-                    // š ¸”s‚É‚àƒAƒNƒeƒBƒuƒIƒyƒŒ[ƒVƒ‡ƒ“‚©‚çíœ
+                    DecrementReferenceCounter(key); // å¤±æ•—æ™‚ã«å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆã‚’æ¸›ã‚‰ã™
+                    // â˜… å¤±æ•—æ™‚ã«ã‚‚ã‚¢ã‚¯ãƒ†ã‚£ãƒ–ã‚ªãƒšãƒ¬ãƒ¼ã‚·ãƒ§ãƒ³ã‹ã‚‰å‰Šé™¤
                     if (_activeOperations.ContainsKey(key) && _activeOperations[key].Equals(handle))
                     {
                         _activeOperations.Remove(key);
                     }
-                    // š ¸”s‚É loadedAssets ‚©‚ç‚àíœ (‚à‚µ’Ç‰Á‚µ‚Ä‚¢‚½ê‡)
+                    // â˜… å¤±æ•—æ™‚ã« loadedAssets ã‹ã‚‰ã‚‚å‰Šé™¤ (ã‚‚ã—è¿½åŠ ã—ã¦ã„ãŸå ´åˆ)
                     _loadedAssets.Remove(key);
-                    // š ¸”s‚É lastAccessTimes ‚©‚ç‚àíœ (•s—v‚È‚ç)
+                    // â˜… å¤±æ•—æ™‚ã« lastAccessTimes ã‹ã‚‰ã‚‚å‰Šé™¤ (ä¸è¦ãªã‚‰)
                     _lastAccessTimes.Remove(key);
                 }
 
-                // š Š®—¹‚µ‚½‚çƒAƒNƒeƒBƒuƒIƒyƒŒ[ƒVƒ‡ƒ“‚©‚çíœ‚·‚é (¬Œ÷/¸”s–â‚í‚¸)
-                // ‚½‚¾‚µAƒnƒ“ƒhƒ‹©‘Ì‚ÍŒã‚Å UnloadSceneAsync ‚Åg‚¤‚½‚ßAƒL[‚Æ‚Ì•R•t‚¯‚Í•Û‚·‚é•K—v‚ª‚ ‚é‚©‚à‚µ‚ê‚È‚¢
-                // ‚±‚±‚Å‚ÍŠ®—¹ = ƒAƒNƒeƒBƒu‚Èƒ[ƒhˆ—‚Å‚Í‚È‚¢A‚Æ‚µ‚Äíœ‚·‚éÀ‘•—á
+                // â˜… å®Œäº†ã—ãŸã‚‰ã‚¢ã‚¯ãƒ†ã‚£ãƒ–ã‚ªãƒšãƒ¬ãƒ¼ã‚·ãƒ§ãƒ³ã‹ã‚‰å‰Šé™¤ã™ã‚‹ (æˆåŠŸ/å¤±æ•—å•ã‚ãš)
+                // ãŸã ã—ã€ãƒãƒ³ãƒ‰ãƒ«è‡ªä½“ã¯å¾Œã§ UnloadSceneAsync ã§ä½¿ã†ãŸã‚ã€ã‚­ãƒ¼ã¨ã®ç´ä»˜ã‘ã¯ä¿æŒã™ã‚‹å¿…è¦ãŒã‚ã‚‹ã‹ã‚‚ã—ã‚Œãªã„
+                // ã“ã“ã§ã¯å®Œäº† = ã‚¢ã‚¯ãƒ†ã‚£ãƒ–ãªãƒ­ãƒ¼ãƒ‰å‡¦ç†ã§ã¯ãªã„ã€ã¨ã—ã¦å‰Šé™¤ã™ã‚‹å®Ÿè£…ä¾‹
                 // if (_activeOperations.ContainsKey(key) && _activeOperations[key].OperationHandle == handle.OperationHandle)
                 // {
                 //      _activeOperations.Remove(key);
                 // }
             };
 
-            // š ŠJnŠÔ‚ğ‹L˜^ (ƒR[ƒ‹ƒoƒbƒN“à‚ÅQÆ‚·‚é‚½‚ß)
+            // â˜… é–‹å§‹æ™‚é–“ã‚’è¨˜éŒ² (ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯å†…ã§å‚ç…§ã™ã‚‹ãŸã‚)
             _lastAccessTimes[key] = Time.realtimeSinceStartup;
 
             return operation;
@@ -453,43 +498,43 @@ namespace AddressableManagementSystem
         /// <summary>
         /// Unloads a scene loaded through Addressables using its handle.
         /// </summary>
-        /// <param name="sceneHandle">AsyncOperationHandle of the loaded scene to unload</param> // š SceneInstance ‚Ì‘ã‚í‚è‚É Handle ‚ğ„§
+        /// <param name="sceneHandle">AsyncOperationHandle of the loaded scene to unload</param> // â˜… SceneInstance ã®ä»£ã‚ã‚Šã« Handle ã‚’æ¨å¥¨
         /// <returns>AsyncOperationHandle for the unload operation</returns>
-        // public AsyncOperationHandle<SceneInstance> UnloadSceneAsync(SceneInstance sceneInstance) // Œ³‚ÌƒVƒOƒlƒ`ƒƒ
-        public AsyncOperationHandle<SceneInstance> UnloadSceneAsync(AsyncOperationHandle<SceneInstance> sceneHandle) // š ƒnƒ“ƒhƒ‹‚Åó‚¯æ‚éƒVƒOƒlƒ`ƒƒ‚É•ÏX
+        // public AsyncOperationHandle<SceneInstance> UnloadSceneAsync(SceneInstance sceneInstance) // å…ƒã®ã‚·ã‚°ãƒãƒãƒ£
+        public AsyncOperationHandle<SceneInstance> UnloadSceneAsync(AsyncOperationHandle<SceneInstance> sceneHandle) // â˜… ãƒãƒ³ãƒ‰ãƒ«ã§å—ã‘å–ã‚‹ã‚·ã‚°ãƒãƒãƒ£ã«å¤‰æ›´
         {
-            // š ƒnƒ“ƒhƒ‹‚ª—LŒø‚©AŠ®—¹‚µ‚Ä‚¢‚é‚©‚È‚Ç‚ğƒ`ƒFƒbƒN
+            // â˜… ãƒãƒ³ãƒ‰ãƒ«ãŒæœ‰åŠ¹ã‹ã€å®Œäº†ã—ã¦ã„ã‚‹ã‹ãªã©ã‚’ãƒã‚§ãƒƒã‚¯
             if (!sceneHandle.IsValid() || !sceneHandle.IsDone || sceneHandle.Status != AsyncOperationStatus.Succeeded)
             {
                 LogWarning($"Attempting to unload an invalid or failed scene handle.");
-                // ¸”s‚µ‚½ƒnƒ“ƒhƒ‹‚ğ•Ô‚·‚©Anull ‚ğ•Ô‚·‚©AƒGƒ‰[‚ğ“Š‚°‚é‚©‚È‚Ç‚ÌİŒv‚ª•K—v
+                // å¤±æ•—ã—ãŸãƒãƒ³ãƒ‰ãƒ«ã‚’è¿”ã™ã‹ã€null ã‚’è¿”ã™ã‹ã€ã‚¨ãƒ©ãƒ¼ã‚’æŠ•ã’ã‚‹ã‹ãªã©ã®è¨­è¨ˆãŒå¿…è¦
                 return Addressables.ResourceManager.CreateCompletedOperation<SceneInstance>(default, "Invalid handle provided for unloading.");
             }
 
             SceneInstance sceneInstance = sceneHandle.Result;
             Log($"Unloading scene: {sceneInstance.Scene.name}");
 
-            // š UnloadSceneAsync ‚É‚Í SceneInstance ‚Ü‚½‚Í Handle ‚ğ“n‚¹‚é
-            var operation = Addressables.UnloadSceneAsync(sceneHandle); // ƒnƒ“ƒhƒ‹‚ÅƒAƒ“ƒ[ƒh
+            // â˜… UnloadSceneAsync ã«ã¯ SceneInstance ã¾ãŸã¯ Handle ã‚’æ¸¡ã›ã‚‹
+            var operation = Addressables.UnloadSceneAsync(sceneHandle); // ãƒãƒ³ãƒ‰ãƒ«ã§ã‚¢ãƒ³ãƒ­ãƒ¼ãƒ‰
 
-            // š ƒAƒ“ƒ[ƒhŠ®—¹‚Ìˆ— (QÆƒJƒEƒ“ƒg‚È‚Ç)
+            // â˜… ã‚¢ãƒ³ãƒ­ãƒ¼ãƒ‰å®Œäº†æ™‚ã®å‡¦ç† (å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆãªã©)
             operation.Completed += unloadHandle =>
             {
                 if (unloadHandle.Status == AsyncOperationStatus.Succeeded)
                 {
                     Log($"Scene unloaded successfully: {sceneInstance.Scene.name}");
-                    // š ƒV[ƒ“‚É‘Î‰‚·‚éƒL[‚ğŒ©‚Â‚¯‚ÄQÆƒJƒEƒ“ƒg‚ğŒ¸‚ç‚·•K—v‚ª‚ ‚é
-                    // ‚±‚Ì‚½‚ß‚É‚ÍALoadSceneAsync ‚É Handle ‚Æ Key ‚Ìƒ}ƒbƒsƒ“ƒO‚ğ•Û‚·‚é•K—v‚ª‚ ‚é
-                    // —á: private Dictionary<AsyncOperationHandle, string> _sceneHandleToKeyMap = new Dictionary<AsyncOperationHandle, string>();
-                    // LoadSceneAsync ‚ÌŠ®—¹ƒR[ƒ‹ƒoƒbƒN‚Åƒ}ƒbƒv‚É’Ç‰Á‚µA‚±‚±‚ÅƒL[‚ğæ“¾‚µ‚Ä DecrementReferenceCounter ‚ğŒÄ‚Ô
-                    // string key = FindKeyForSceneHandle(sceneHandle); // ‚±‚Ì‚æ‚¤‚Èƒƒ\ƒbƒh‚ª•K—v
+                    // â˜… ã‚·ãƒ¼ãƒ³ã«å¯¾å¿œã™ã‚‹ã‚­ãƒ¼ã‚’è¦‹ã¤ã‘ã¦å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆã‚’æ¸›ã‚‰ã™å¿…è¦ãŒã‚ã‚‹
+                    // ã“ã®ãŸã‚ã«ã¯ã€LoadSceneAsync æ™‚ã« Handle ã¨ Key ã®ãƒãƒƒãƒ”ãƒ³ã‚°ã‚’ä¿æŒã™ã‚‹å¿…è¦ãŒã‚ã‚‹
+                    // ä¾‹: private Dictionary<AsyncOperationHandle, string> _sceneHandleToKeyMap = new Dictionary<AsyncOperationHandle, string>();
+                    // LoadSceneAsync ã®å®Œäº†ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯ã§ãƒãƒƒãƒ—ã«è¿½åŠ ã—ã€ã“ã“ã§ã‚­ãƒ¼ã‚’å–å¾—ã—ã¦ DecrementReferenceCounter ã‚’å‘¼ã¶
+                    // string key = FindKeyForSceneHandle(sceneHandle); // ã“ã®ã‚ˆã†ãªãƒ¡ã‚½ãƒƒãƒ‰ãŒå¿…è¦
                     // if (!string.IsNullOrEmpty(key))
                     // {
                     //     DecrementReferenceCounter(key);
-                    //     // ‘¼‚Ìƒgƒ‰ƒbƒLƒ“ƒOî•ñ‚àíœ
+                    //     // ä»–ã®ãƒˆãƒ©ãƒƒã‚­ãƒ³ã‚°æƒ…å ±ã‚‚å‰Šé™¤
                     //     _loadedAssets.Remove(key);
                     //     _lastAccessTimes.Remove(key);
-                    //     // _sceneHandleToKeyMap.Remove(sceneHandle); // ƒ}ƒbƒv‚©‚ç‚àíœ
+                    //     // _sceneHandleToKeyMap.Remove(sceneHandle); // ãƒãƒƒãƒ—ã‹ã‚‰ã‚‚å‰Šé™¤
                     // } else {
                     //     LogWarning($"Could not find original key for unloaded scene: {sceneInstance.Scene.name}");
                     // }
@@ -498,44 +543,44 @@ namespace AddressableManagementSystem
                 {
                     LogError($"Failed to unload scene: {sceneInstance.Scene.name} - {unloadHandle.OperationException}");
                 }
-                // š ƒAƒ“ƒ[ƒh‘€ì‚ÌŠ®—¹ŒãAŒ³‚Ìƒ[ƒhƒnƒ“ƒhƒ‹‚ğ‰ğ•ú‚·‚é•K—v‚ª‚ ‚é‚©Šm”F
-                // ’ÊíAUnloadSceneAsync ‚ª¬Œ÷‚·‚ê‚Î“à•”‚Å‰ğ•ú‚³‚ê‚é‚±‚Æ‚ª‘½‚¢‚ªAƒhƒLƒ…ƒƒ“ƒgŠm”F„§
-                // Addressables.Release(sceneHandle); // •K—v‚Å‚ ‚ê‚Î‚±‚±‚Å‰ğ•ú
+                // â˜… ã‚¢ãƒ³ãƒ­ãƒ¼ãƒ‰æ“ä½œã®å®Œäº†å¾Œã€å…ƒã®ãƒ­ãƒ¼ãƒ‰ãƒãƒ³ãƒ‰ãƒ«ã‚’è§£æ”¾ã™ã‚‹å¿…è¦ãŒã‚ã‚‹ã‹ç¢ºèª
+                // é€šå¸¸ã€UnloadSceneAsync ãŒæˆåŠŸã™ã‚Œã°å†…éƒ¨ã§è§£æ”¾ã•ã‚Œã‚‹ã“ã¨ãŒå¤šã„ãŒã€ãƒ‰ã‚­ãƒ¥ãƒ¡ãƒ³ãƒˆç¢ºèªæ¨å¥¨
+                // Addressables.Release(sceneHandle); // å¿…è¦ã§ã‚ã‚Œã°ã“ã“ã§è§£æ”¾
             };
 
 
             return operation;
         }
 
-        // š ReleaseAsset ‚à Handle ‚ğó‚¯æ‚éƒI[ƒo[ƒ[ƒh‚ğ’Ç‰Á‚·‚é‚Æ•Ö—˜
+        // â˜… ReleaseAsset ã‚‚ Handle ã‚’å—ã‘å–ã‚‹ã‚ªãƒ¼ãƒãƒ¼ãƒ­ãƒ¼ãƒ‰ã‚’è¿½åŠ ã™ã‚‹ã¨ä¾¿åˆ©
         /// <summary>
         /// Reduces the reference count for an asset using its handle, and unloads it if no longer needed.
         /// </summary>
         /// <param name="handle">AsyncOperationHandle for the asset</param>
         public void ReleaseAsset(AsyncOperationHandle handle)
         {
-            // š Handle ‚©‚ç Key ‚ğŒ©‚Â‚¯‚éƒƒWƒbƒN‚ª•K—v
-            // —á: _activeOperations ‚â _loadedAssets ‚ğ‹tˆø‚«‚·‚é‚©A•Ê“rƒ}ƒbƒsƒ“ƒO‚ğ‚Â
-            // string key = FindKeyForHandle(handle); // ‚±‚Ì‚æ‚¤‚Èƒƒ\ƒbƒh‚ª•K—v
+            // â˜… Handle ã‹ã‚‰ Key ã‚’è¦‹ã¤ã‘ã‚‹ãƒ­ã‚¸ãƒƒã‚¯ãŒå¿…è¦
+            // ä¾‹: _activeOperations ã‚„ _loadedAssets ã‚’é€†å¼•ãã™ã‚‹ã‹ã€åˆ¥é€”ãƒãƒƒãƒ”ãƒ³ã‚°ã‚’æŒã¤
+            // string key = FindKeyForHandle(handle); // ã“ã®ã‚ˆã†ãªãƒ¡ã‚½ãƒƒãƒ‰ãŒå¿…è¦
             // if (!string.IsNullOrEmpty(key))
             // {
-            //     ReleaseAsset(key); // ƒL[‚Å‰ğ•ú‚·‚éŠù‘¶‚Ìƒƒ\ƒbƒh‚ğŒÄ‚Ô
+            //     ReleaseAsset(key); // ã‚­ãƒ¼ã§è§£æ”¾ã™ã‚‹æ—¢å­˜ã®ãƒ¡ã‚½ãƒƒãƒ‰ã‚’å‘¼ã¶
             // }
-            // else if (handle.IsValid()) // ƒL[‚ªŒ©‚Â‚©‚ç‚È‚­‚Ä‚àƒnƒ“ƒhƒ‹‚ª—LŒø‚È‚ç‰ğ•ú‚ğ‚İ‚é
+            // else if (handle.IsValid()) // ã‚­ãƒ¼ãŒè¦‹ã¤ã‹ã‚‰ãªãã¦ã‚‚ãƒãƒ³ãƒ‰ãƒ«ãŒæœ‰åŠ¹ãªã‚‰è§£æ”¾ã‚’è©¦ã¿ã‚‹
             // {
             //      LogWarning($"Could not find key for handle {handle.OperationHandle}, releasing handle directly.");
             //      Addressables.Release(handle);
-            // š ’¼Ú‰ğ•ú‚µ‚½ê‡AQÆƒJƒEƒ“ƒg‚È‚Ç‚ÌŠÇ—‚Æ–µ‚‚µ‚È‚¢‚©’ˆÓ‚ª•K—v
+            // â˜… ç›´æ¥è§£æ”¾ã—ãŸå ´åˆã€å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆãªã©ã®ç®¡ç†ã¨çŸ›ç›¾ã—ãªã„ã‹æ³¨æ„ãŒå¿…è¦
             // } else {
             //      LogWarning($"Attempting to release an invalid handle.");
             // }
 
-            // === À‘•—á (ƒL[‚ªŒ©‚Â‚©‚ç‚È‚¢ê‡A’¼Úƒnƒ“ƒhƒ‹‰ğ•ú) ===
-            // ‚±‚ÌÀ‘•‚ÍQÆƒJƒEƒ“ƒg‚Æ˜A“®‚µ‚È‚¢‰Â”\«‚ª‚ ‚é‚½‚ß’ˆÓ
+            // === å®Ÿè£…ä¾‹ (ã‚­ãƒ¼ãŒè¦‹ã¤ã‹ã‚‰ãªã„å ´åˆã€ç›´æ¥ãƒãƒ³ãƒ‰ãƒ«è§£æ”¾) ===
+            // ã“ã®å®Ÿè£…ã¯å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆã¨é€£å‹•ã—ãªã„å¯èƒ½æ€§ãŒã‚ã‚‹ãŸã‚æ³¨æ„
             if (handle.IsValid())
             {
-                // ‰¼: ƒL[‚ª“Á’è‚Å‚«‚È‚¢ê‡‚Å‚àƒnƒ“ƒhƒ‹‚ğ‰ğ•ú‚·‚éB
-                // –{—ˆ‚ÍƒL[‚Æ•R•t‚¯‚ÄQÆƒJƒEƒ“ƒg‚ğŠÇ—‚·‚×‚«B
+                // ä»®: ã‚­ãƒ¼ãŒç‰¹å®šã§ããªã„å ´åˆã§ã‚‚ãƒãƒ³ãƒ‰ãƒ«ã‚’è§£æ”¾ã™ã‚‹ã€‚
+                // æœ¬æ¥ã¯ã‚­ãƒ¼ã¨ç´ä»˜ã‘ã¦å‚ç…§ã‚«ã‚¦ãƒ³ãƒˆã‚’ç®¡ç†ã™ã¹ãã€‚
 
                 //LogWarning($"Releasing handle {handle.OperationHandle} directly without key mapping. Reference counting might be inaccurate.");
 
@@ -547,7 +592,7 @@ namespace AddressableManagementSystem
         /// Reduces the reference count for an asset using its key, and unloads it if no longer needed.
         /// </summary>
         /// <param name="key">Addressable key for the asset</param>
-        public void ReleaseAsset(string key) // Šù‘¶‚ÌƒL[‚Å‰ğ•ú‚·‚éƒƒ\ƒbƒh
+        public void ReleaseAsset(string key) // æ—¢å­˜ã®ã‚­ãƒ¼ã§è§£æ”¾ã™ã‚‹ãƒ¡ã‚½ãƒƒãƒ‰
         {
             if (!_referenceCounters.ContainsKey(key))
             {
@@ -561,7 +606,7 @@ namespace AddressableManagementSystem
             if (_referenceCounters[key] <= 0)
             {
                 Log($"Asset reference count reached zero: {key}. Marked for potential unload.");
-                // š ‘¦‰ğ•ú‚·‚éê‡:
+                // â˜… å³æ™‚è§£æ”¾ã™ã‚‹å ´åˆ:
                 // if (_activeOperations.TryGetValue(key, out AsyncOperationHandle handle))
                 // {
                 //     Log($"Unloading asset immediately: {key}");
@@ -576,20 +621,20 @@ namespace AddressableManagementSystem
                 //      LogWarning($"Could not find handle to release for key: {key}");
                 // }
 
-                // š ‚Ü‚½‚ÍAƒ^ƒCƒ€ƒAƒEƒg/ƒƒ‚ƒŠŠÄ‹‚É”C‚¹‚éê‡:
+                // â˜… ã¾ãŸã¯ã€ã‚¿ã‚¤ãƒ ã‚¢ã‚¦ãƒˆ/ãƒ¡ãƒ¢ãƒªç›£è¦–ã«ä»»ã›ã‚‹å ´åˆ:
                 _lastAccessTimes[key] = Time.realtimeSinceStartup;
             }
         }
 
-        // ... ‘¼‚Ìƒƒ\ƒbƒh ...
+        // ... ä»–ã®ãƒ¡ã‚½ãƒƒãƒ‰ ...
 
-        // š SceneHandle ‚Æ Key ‚Ìƒ}ƒbƒsƒ“ƒO‚Ì‚½‚ß‚Ì•â•“I‚Èˆ—‚ª•K—v‚É‚È‚é‰Â”\«‚ğ¦´
-        // —á:
+        // â˜… SceneHandle ã¨ Key ã®ãƒãƒƒãƒ”ãƒ³ã‚°ã®ãŸã‚ã®è£œåŠ©çš„ãªå‡¦ç†ãŒå¿…è¦ã«ãªã‚‹å¯èƒ½æ€§ã‚’ç¤ºå”†
+        // ä¾‹:
         // private Dictionary<AsyncOperationHandle, string> _handleToKeyMap = new Dictionary<AsyncOperationHandle, string>();
         // private string FindKeyForHandle(AsyncOperationHandle handle) { ... }
         // private void MapHandleToKey(AsyncOperationHandle handle, string key) { ... }
-        // LoadAssetCoroutine ‚â LoadSceneAsync ‚ÌŠ®—¹‚É MapHandleToKey ‚ğŒÄ‚Ô
-        // ReleaseAsset(AsyncOperationHandle) ‚â UnloadSceneAsync ‚ÌŠ®—¹‚É FindKeyForHandle ‚ğŒÄ‚Ô
+        // LoadAssetCoroutine ã‚„ LoadSceneAsync ã®å®Œäº†æ™‚ã« MapHandleToKey ã‚’å‘¼ã¶
+        // ReleaseAsset(AsyncOperationHandle) ã‚„ UnloadSceneAsync ã®å®Œäº†æ™‚ã« FindKeyForHandle ã‚’å‘¼ã¶
 
         /// <summary>
         /// Force unloads an asset regardless of reference count.
