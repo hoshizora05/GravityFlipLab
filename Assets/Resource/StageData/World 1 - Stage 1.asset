@@ -1,0 +1,348 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a79e90db22e6e2499c652f485f46737, type: 3}
+  m_Name: World 1 - Stage 1
+  m_EditorClassIdentifier: 
+  stageInfo:
+    worldNumber: 1
+    stageNumber: 1
+    stageName: Tutorial Stage
+    timeLimit: 300
+    energyChipCount: 3
+    playerStartPosition: {x: 0, y: 0, z: 0}
+    goalPosition: {x: 40, y: 0, z: 0}
+    checkpointPositions:
+    - {x: 10, y: 0, z: 0}
+    - {x: 20, y: 0, z: 0}
+    - {x: 30, y: 0, z: 0}
+    theme: 0
+    stageLength: 4096
+    stageHeight: 1024
+    segmentCount: 16
+  backgroundLayers:
+  - layerName: FarBackground
+    backgroundSprite: {fileID: 21300000, guid: 151eef41825813d4f96dd0d4c8ecdc2f, type: 3}
+    parallaxFactor: 0.25
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  - layerName: MidBackground
+    backgroundSprite: {fileID: 21300000, guid: 072fb9c03f98b8541804c8632eda3b74, type: 3}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  - layerName: NearBackground
+    backgroundSprite: {fileID: 21300000, guid: 17729fe1353b2f247bf96445ab7798b1, type: 3}
+    parallaxFactor: 0.75
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  obstacles:
+  - type: 0
+    position: {x: 40, y: -6.74, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  - type: 1
+    position: {x: 50, y: -6.74, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+  collectibles:
+  - type: 0
+    position: {x: 15, y: 2, z: 0}
+    value: 0
+  - type: 0
+    position: {x: 25, y: -1, z: 0}
+    value: 0
+  - type: 0
+    position: {x: 35, y: 1, z: 0}
+    value: 0
+  environmental: []
+  terrainLayers:
+  - layerName: Ground
+    layerType: 0
+    sortingOrder: 0
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants:
+    - {fileID: 0}
+    physicsMaterial: {fileID: 6200000, guid: f1f5944787dd63f46b002bdebe1203fc, type: 2}
+    autoGenerate: 1
+    baseHeight: -5
+    thickness: 3
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  - layerName: Platforms
+    layerType: 1
+    sortingOrder: 10
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 0
+    baseHeight: 0
+    thickness: 1
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  - layerName: Background
+    layerType: 2
+    sortingOrder: -10
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 0
+    baseHeight: -10
+    thickness: 1
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  terrainSegments:
+  - segmentIndex: 0
+    startPosition: {x: 0, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 1
+    startPosition: {x: 16, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 2
+    startPosition: {x: 32, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 3
+    startPosition: {x: 48, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 4
+    startPosition: {x: 64, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 5
+    startPosition: {x: 80, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 6
+    startPosition: {x: 96, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 7
+    startPosition: {x: 112, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 8
+    startPosition: {x: 128, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 9
+    startPosition: {x: 144, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 10
+    startPosition: {x: 160, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 11
+    startPosition: {x: 176, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 12
+    startPosition: {x: 192, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 13
+    startPosition: {x: 208, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 14
+    startPosition: {x: 224, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 15
+    startPosition: {x: 240, y: -5}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  tileMapSize: {x: 256, y: 64}
+  tileSize: 16
+  useCompositeCollider: 1
+  heightMap: {fileID: 0}
+  terrainCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  enableProceduralGeneration: 0
+  proceduralSeed: 0
+  slopes:
+  - type: 0
+    position: {x: 20, y: -6.74, z: 0}
+    rotation: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    slopeAngle: 30
+    slopeDirection: 0
+    slopeLength: 5
+    speedMultiplier: 1.2
+    affectGravity: 1
+    gravityRedirection: 0.5

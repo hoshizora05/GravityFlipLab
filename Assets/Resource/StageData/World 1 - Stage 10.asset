@@ -1,0 +1,317 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a79e90db22e6e2499c652f485f46737, type: 3}
+  m_Name: World 1 - Stage 10
+  m_EditorClassIdentifier: 
+  stageInfo:
+    worldNumber: 1
+    stageNumber: 10
+    stageName: World 1 - Stage 10
+    timeLimit: 300
+    energyChipCount: 3
+    playerStartPosition: {x: 0, y: 0, z: 0}
+    goalPosition: {x: 0, y: 0, z: 0}
+    checkpointPositions: []
+    theme: 0
+    stageLength: 4096
+    stageHeight: 1024
+    segmentCount: 16
+  backgroundLayers:
+  - layerName: 
+    backgroundSprite: {fileID: 0}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  - layerName: 
+    backgroundSprite: {fileID: 0}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  - layerName: 
+    backgroundSprite: {fileID: 0}
+    parallaxFactor: 0.5
+    tileSize: {x: 512, y: 512}
+    enableVerticalLoop: 0
+    tintColor: {r: 1, g: 1, b: 1, a: 1}
+  obstacles: []
+  collectibles: []
+  environmental: []
+  terrainLayers:
+  - layerName: Ground
+    layerType: 0
+    sortingOrder: 0
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 1
+    baseHeight: -5
+    thickness: 2
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  - layerName: Ground
+    layerType: 0
+    sortingOrder: 0
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 1
+    baseHeight: -5
+    thickness: 2
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  - layerName: Ground
+    layerType: 0
+    sortingOrder: 0
+    collisionLayer:
+      serializedVersion: 2
+      m_Bits: 1
+    tileVariants: []
+    physicsMaterial: {fileID: 0}
+    autoGenerate: 1
+    baseHeight: -5
+    thickness: 2
+    generationMode: 0
+    noiseScale: 0.1
+    noiseAmplitude: 2
+    noiseSeed: 0
+    tileSelectionMode: 0
+    enableTileRotation: 0
+    depthTileDistribution:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  terrainSegments:
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  - segmentIndex: 0
+    startPosition: {x: 0, y: 0}
+    size: {x: 16, y: 3}
+    pattern: 0
+    heightVariation: 0
+    platforms: []
+    features: []
+  tileMapSize: {x: 256, y: 64}
+  tileSize: 16
+  useCompositeCollider: 1
+  heightMap: {fileID: 0}
+  terrainCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  enableProceduralGeneration: 0
+  proceduralSeed: 0
+  slopes: []

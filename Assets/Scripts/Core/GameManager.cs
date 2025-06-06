@@ -160,9 +160,25 @@ namespace GravityFlipLab
 
         public void SetCurrentStage(int world, int stage)
         {
+            // 範囲チェック
+            if (world < 1 || world > ConfigManager.Instance.maxWorlds)
+            {
+                Debug.LogError($"GameManager: Invalid world number: {world}. Must be between 1 and {ConfigManager.Instance.maxWorlds}");
+                return;
+            }
+
+            if (stage < 1 || stage > ConfigManager.Instance.stagesPerWorld)
+            {
+                Debug.LogError($"GameManager: Invalid stage number: {stage}. Must be between 1 and {ConfigManager.Instance.stagesPerWorld}");
+                return;
+            }
+
             currentWorld = world;
             currentStage = stage;
             OnStageChanged?.Invoke(world, stage);
+
+            string expectedAddressableKey = $"Stage{world}-{stage}";
+            Debug.Log($"GameManager: Expected Addressable key: {expectedAddressableKey}");
         }
 
         public void StartStage(int world, int stage)
@@ -177,6 +193,30 @@ namespace GravityFlipLab
         public void CompleteStage(float clearTime, int deathCount, int energyChips)
         {
             string stageKey = $"{currentWorld}-{currentStage}";
+
+            // StageManagerから実際のステージ情報を取得して確認
+            if (Stage.StageManager.Instance != null)
+            {
+                var stageInfo = Stage.StageManager.Instance.GetCurrentStageInfo();
+                if (stageInfo != null)
+                {
+                    // StageInfoの値と現在の値が一致するかログ出力
+                    if (stageInfo.worldNumber == currentWorld && stageInfo.stageNumber == currentStage)
+                    {
+                        Debug.Log($"GameManager: Stage completion confirmed - {stageInfo.stageName} (World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber})");
+
+                        // Addressableキーも確認
+                        string addressableKey = Stage.StageManager.GetAddressableKeyFromStageInfo(stageInfo);
+                        Debug.Log($"GameManager: Completed Addressable stage: {addressableKey}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"GameManager: Stage info mismatch during completion! " +
+                                        $"Current: World {currentWorld}, Stage {currentStage}, " +
+                                        $"StageInfo: World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber}");
+                    }
+                }
+            }
 
             // Update stage progress
             if (!playerProgress.stageProgress.ContainsKey(stageKey))

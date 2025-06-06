@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: StageData
+  m_EditorClassIdentifier: 
+  m_GroupName: StageData
+  m_GUID: 05a0a3488e9ef6e42926cbbc9baca98a
+  m_SerializeEntries:
+  - m_GUID: 0b8a297642609bc438cb0eecdcb45335
+    m_Address: Stage1-8
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 14760d1c3ecc6d74d82d88670427b965
+    m_Address: Stage1-6
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 27eaa89704edeb3459aa999af610305e
+    m_Address: Stage1-1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 314cbb998c56c9d4caeb4aa876fe81e5
+    m_Address: Stage1-3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 55e270a2267520c46ac32ed52f9e8920
+    m_Address: Stage1-4
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 753a9bafd603df14284504ae49df129b
+    m_Address: Stage1-9
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 79c3171370dd86f4595ccbb82aa1235d
+    m_Address: Stage1-2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 843f8460387e10043be2f1136bd27f2b
+    m_Address: Stage1-5
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f4697eb46dd6ce94c93b6506179035df
+    m_Address: Stage1-7
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fb0121a574e0fee43a192df63a9bb9a5
+    m_Address: Stage1-10
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - StageData
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 352369850365b6d4783a88218187f925, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: db16d436fe455eb49a072a5ead5d2857, type: 2}
+    - {fileID: 11400000, guid: 3e87ba1ac82a2c244851546237bffdfb, type: 2}

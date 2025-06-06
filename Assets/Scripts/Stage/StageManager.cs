@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using GravityFlipLab.Player;
+using AddressableManagementSystem;
 
 namespace GravityFlipLab.Stage
 {
@@ -248,6 +249,9 @@ namespace GravityFlipLab.Stage
                 yield break;
             }
 
+            Debug.Log("StageManager: Waiting for AddressableResourceManager initialization...");
+            yield return StartCoroutine(WaitForAddressableInitialization());
+
             // 2. GameManagerの準備を待つ
             yield return new WaitUntil(() => GameManager.Instance != null);
             Debug.Log("StageManager: GameManager ready");
@@ -278,6 +282,73 @@ namespace GravityFlipLab.Stage
             }
 
             isInitializing = false;
+        }
+        /// <summary>
+        /// AddressableResourceManagerの初期化を待つ
+        /// </summary>
+        private IEnumerator WaitForAddressableInitialization()
+        {
+            var resourceManager = AddressableResourceManager.Instance;
+
+            // 初期化されるまで待機
+            float timeout = 10f; // 10秒でタイムアウト
+            float elapsedTime = 0f;
+
+            while (!resourceManager.IsInitialized && elapsedTime < timeout)
+            {
+                yield return new WaitForSeconds(0.1f);
+                elapsedTime += 0.1f;
+            }
+
+            if (!resourceManager.IsInitialized)
+            {
+                Debug.LogError("StageManager: AddressableResourceManager initialization timed out!");
+
+                // 手動で初期化を試行
+                Debug.Log("StageManager: Attempting manual initialization of AddressableResourceManager...");
+                yield return StartCoroutine(InitializeAddressableResourceManager());
+            }
+            else
+            {
+                Debug.Log("StageManager: AddressableResourceManager is ready");
+            }
+        }
+
+        /// <summary>
+        /// AddressableResourceManagerを手動で初期化
+        /// </summary>
+        private IEnumerator InitializeAddressableResourceManager()
+        {
+            var resourceManager = AddressableResourceManager.Instance;
+
+            // 非同期初期化をコルーチンで実行
+            bool initializationComplete = false;
+            System.Exception initializationException = null;
+
+            // 初期化タスクを開始
+            var initTask = resourceManager.Initialize();
+
+            // タスクの完了を待つ
+            while (!initTask.IsCompleted)
+            {
+                yield return null;
+            }
+
+            if (initTask.Exception != null)
+            {
+                initializationException = initTask.Exception;
+                Debug.LogError($"StageManager: Failed to initialize AddressableResourceManager: {initializationException}");
+            }
+            else
+            {
+                initializationComplete = true;
+                Debug.Log("StageManager: AddressableResourceManager manually initialized successfully");
+            }
+
+            if (!initializationComplete)
+            {
+                Debug.LogError("StageManager: Cannot proceed without AddressableResourceManager");
+            }
         }
 
         /// <summary>
@@ -360,7 +431,7 @@ namespace GravityFlipLab.Stage
             Debug.Log("StageManager: Components initialized");
         }
 
-        public void LoadStage(StageDataSO stageData)
+        public async void LoadStage(StageDataSO stageData)
         {
             if (stageData == null)
             {
@@ -369,8 +440,109 @@ namespace GravityFlipLab.Stage
             }
 
             Debug.Log($"StageManager: Loading stage data: {stageData.name}");
+
+            // StageInfoの整合性チェック（非同期）
+            bool isValid = await ValidateStageInfoAsync(stageData);
+            if (!isValid)
+            {
+                Debug.LogError($"StageManager: Stage validation failed for {stageData.name}");
+                return;
+            }
+
             currentStageData = stageData;
             StartCoroutine(LoadStageCoroutine());
+        }
+
+        /// <summary>
+        /// ステージに関連するアセットをプリロード
+        /// </summary>
+        public async System.Threading.Tasks.Task PreloadStageAssetsAsync(int world, int stage)
+        {
+            string stageKey = $"Stage{world}-{stage}";
+
+            try
+            {
+                Debug.Log($"StageManager: Preloading assets for {stageKey}");
+
+                // メインのステージデータをプリロード
+                var resourceManager = AddressableResourceManager.Instance;
+                var stageKeys = new List<string> { stageKey };
+                await resourceManager.PreloadAssetsAsync<StageDataSO>(stageKeys, AddressableResourceManager.LoadPriority.High);
+
+                // ステージ関連のラベルでアセットをプリロード（例：World1, Stage関連）
+                string worldLabel = $"World{world}";
+                var worldAssets = await AddressableHelper.GetKeysWithLabel(worldLabel);
+
+                if (worldAssets.Count > 0)
+                {
+                    await resourceManager.PreloadAssetsAsync<UnityEngine.Object>(worldAssets, AddressableResourceManager.LoadPriority.Normal);
+                    Debug.Log($"StageManager: Preloaded {worldAssets.Count} world assets for {worldLabel}");
+                }
+
+                Debug.Log($"StageManager: Asset preloading completed for {stageKey}");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"StageManager: Error preloading assets for {stageKey}: {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 現在のステージアセットをリリース
+        /// </summary>
+        public void ReleaseCurrentStageAssets()
+        {
+            if (currentStageData?.stageInfo == null) return;
+
+            string stageKey = GetAddressableKeyFromStageInfo(currentStageData.stageInfo);
+
+            if (!string.IsNullOrEmpty(stageKey))
+            {
+                AddressableResourceManager.Instance.ReleaseAsset(stageKey);
+                Debug.Log($"StageManager: Released stage assets for {stageKey}");
+            }
+        }
+
+
+        /// <summary>
+        /// StageInfoの整合性をチェック
+        /// </summary>
+        private bool ValidateStageInfo(StageDataSO stageData)
+        {
+            if (stageData?.stageInfo == null)
+            {
+                Debug.LogError("StageManager: StageInfo is null");
+                return false;
+            }
+
+            if (GameManager.Instance == null)
+            {
+                Debug.LogError("StageManager: GameManager is not available for validation");
+                return false;
+            }
+
+            var stageInfo = stageData.stageInfo;
+            int expectedWorld = GameManager.Instance.currentWorld;
+            int expectedStage = GameManager.Instance.currentStage;
+
+            // worldNumberとstageNumberが設定されているかチェック
+            if (stageInfo.worldNumber <= 0 || stageInfo.stageNumber <= 0)
+            {
+                Debug.LogError($"StageManager: Invalid stage numbers in StageInfo - World: {stageInfo.worldNumber}, Stage: {stageInfo.stageNumber}");
+                return false;
+            }
+
+            // GameManagerの期待値と一致するかチェック
+            if (stageInfo.worldNumber != expectedWorld || stageInfo.stageNumber != expectedStage)
+            {
+                Debug.LogError($"StageManager: Stage number mismatch! " +
+                              $"Expected: World {expectedWorld}, Stage {expectedStage}, " +
+                              $"Got: World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber}");
+                return false;
+            }
+
+            Debug.Log($"StageManager: Stage validation passed - World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber}");
+            return true;
         }
 
         public void LoadCurrentStage()
@@ -396,23 +568,204 @@ namespace GravityFlipLab.Stage
             }
         }
 
-        public void LoadStageByNumber(int world, int stage)
+        /// <summary>
+        /// StageInfoの値を使用してステージをロード（Addressable対応）
+        /// </summary>
+        public async void LoadStageByNumber(int world, int stage)
         {
-            string resourcePath = $"StageData/World{world}/Stage{world}-{stage}";
-            StageDataSO stageData = Resources.Load<StageDataSO>(resourcePath);
+            Debug.Log($"StageManager: Loading stage World {world}, Stage {stage}");
 
-            if (stageData != null)
-            {
-                Debug.Log($"StageManager: Loaded stage data from resources: {resourcePath}");
-                LoadStage(stageData);
-            }
-            else
-            {
-                Debug.LogError($"StageManager: Stage data not found: {resourcePath}");
+            // StageInfoの値を使用してAddressableキーを構築
+            string addressableKey = $"Stage{world}-{stage}";
 
-                // フォールバック: デフォルトのステージデータを作成
-                CreateDefaultStageData(world, stage);
+            try
+            {
+                // Addressableでキーの存在確認
+                bool keyExists = await AddressableHelper.ValidateKeyExists(addressableKey);
+
+                if (!keyExists)
+                {
+                    Debug.LogError($"StageManager: Addressable key not found: {addressableKey}");
+                    Debug.LogError("StageManager: Critical error - Cannot continue without valid stage data");
+                    return;
+                }
+
+                // AddressableResourceManagerを使用してステージデータをロード
+                var resourceManager = AddressableResourceManager.Instance;
+                // 初期化されていない場合は初期化を待つ
+                if (!resourceManager.IsInitialized)
+                {
+                    Debug.Log("StageManager: AddressableResourceManager not initialized, waiting for initialization...");
+                    await resourceManager.Initialize();
+                    Debug.Log("StageManager: AddressableResourceManager initialization completed");
+                }
+
+                var stageDataHandle = resourceManager.LoadAssetAsync<StageDataSO>(addressableKey);
+
+                // ハンドルが有効かチェック
+                if (!stageDataHandle.IsValid())
+                {
+                    Debug.LogError($"StageManager: Invalid handle returned for {addressableKey}");
+                    return;
+                }
+
+                Debug.Log($"StageManager: Handle created, waiting for completion...");
+
+                // AsyncOperationHandle<T>のTaskを待機
+                await stageDataHandle.Task;
+
+                if (stageDataHandle.Status == UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded)
+                {
+                    StageDataSO stageData = stageDataHandle.Result;
+                    Debug.Log($"StageManager: Loaded stage data from Addressables: {addressableKey}");
+
+                    // ロードしたステージデータのStageInfoを検証
+                    if (stageData.stageInfo != null)
+                    {
+                        if (stageData.stageInfo.worldNumber != world || stageData.stageInfo.stageNumber != stage)
+                        {
+                            Debug.LogError($"StageManager: Critical error - Addressable key and StageInfo mismatch! " +
+                                          $"Addressable key: {addressableKey}, " +
+                                          $"StageInfo: World {stageData.stageInfo.worldNumber}, Stage {stageData.stageInfo.stageNumber}");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError($"StageManager: StageInfo is null in loaded stage data: {addressableKey}");
+                        return;
+                    }
+
+                    LoadStage(stageData);
+                }
+                else
+                {
+                    Debug.LogError($"StageManager: Failed to load stage data from Addressables: {addressableKey}");
+                    Debug.LogError("StageManager: Critical error - Cannot continue without valid stage data");
+                }
             }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"StageManager: Exception while loading stage data: {e.Message}");
+                Debug.LogError("StageManager: Critical error - Cannot continue without valid stage data");
+            }
+        }
+        /// <summary>
+        /// StageInfoから適切なAddressableキーを生成
+        /// </summary>
+        public static string GetAddressableKeyFromStageInfo(StageInfo stageInfo)
+        {
+            if (stageInfo == null) return null;
+            return $"Stage{stageInfo.worldNumber}-{stageInfo.stageNumber}";
+        }
+
+        /// <summary>
+        /// StageInfoの整合性をチェック（Addressable対応）
+        /// </summary>
+        private async System.Threading.Tasks.Task<bool> ValidateStageInfoAsync(StageDataSO stageData)
+        {
+            if (stageData?.stageInfo == null)
+            {
+                Debug.LogError("StageManager: StageInfo is null");
+                return false;
+            }
+
+            if (GameManager.Instance == null)
+            {
+                Debug.LogError("StageManager: GameManager is not available for validation");
+                return false;
+            }
+
+            var stageInfo = stageData.stageInfo;
+            int expectedWorld = GameManager.Instance.currentWorld;
+            int expectedStage = GameManager.Instance.currentStage;
+
+            // worldNumberとstageNumberが設定されているかチェック
+            if (stageInfo.worldNumber <= 0 || stageInfo.stageNumber <= 0)
+            {
+                Debug.LogError($"StageManager: Invalid stage numbers in StageInfo - World: {stageInfo.worldNumber}, Stage: {stageInfo.stageNumber}");
+                return false;
+            }
+
+            // GameManagerの期待値と一致するかチェック
+            if (stageInfo.worldNumber != expectedWorld || stageInfo.stageNumber != expectedStage)
+            {
+                Debug.LogError($"StageManager: Stage number mismatch! " +
+                              $"Expected: World {expectedWorld}, Stage {expectedStage}, " +
+                              $"Got: World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber}");
+                return false;
+            }
+
+            // Addressableキーの存在確認
+            string expectedAddressableKey = GetAddressableKeyFromStageInfo(stageInfo);
+            bool keyExists = await AddressableHelper.ValidateKeyExists(expectedAddressableKey);
+
+            if (!keyExists)
+            {
+                Debug.LogError($"StageManager: Addressable key does not exist: {expectedAddressableKey}");
+                return false;
+            }
+
+            Debug.Log($"StageManager: Stage validation passed - World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber}, Key: {expectedAddressableKey}");
+            return true;
+        }
+
+        /// <summary>
+        /// 次のステージをプリロード（パフォーマンス向上のため）
+        /// </summary>
+        public async void PreloadNextStage()
+        {
+            if (GameManager.Instance == null || currentStageData?.stageInfo == null) return;
+
+            int currentWorld = currentStageData.stageInfo.worldNumber;
+            int currentStage = currentStageData.stageInfo.stageNumber;
+
+            // 次のステージを計算
+            int nextWorld = currentWorld;
+            int nextStage = currentStage + 1;
+
+            // ワールドの境界チェック
+            if (nextStage > ConfigManager.Instance.stagesPerWorld)
+            {
+                nextWorld++;
+                nextStage = 1;
+
+                if (nextWorld > ConfigManager.Instance.maxWorlds)
+                {
+                    Debug.Log("StageManager: No next stage to preload (reached end)");
+                    return;
+                }
+            }
+
+            // 次のステージが解放されているかチェック
+            if (ConfigManager.Instance.IsStageUnlocked(nextWorld, nextStage))
+            {
+                await PreloadStageAssetsAsync(nextWorld, nextStage);
+            }
+        }
+
+        /// <summary>
+        /// 現在ロードされているステージの情報を取得
+        /// </summary>
+        public StageInfo GetCurrentStageInfo()
+        {
+            return currentStageData?.stageInfo;
+        }
+
+        /// <summary>
+        /// 現在ロードされているステージのワールド番号を取得
+        /// </summary>
+        public int GetCurrentWorldNumber()
+        {
+            return currentStageData?.stageInfo?.worldNumber ?? 0;
+        }
+
+        /// <summary>
+        /// 現在ロードされているステージのステージ番号を取得
+        /// </summary>
+        public int GetCurrentStageNumber()
+        {
+            return currentStageData?.stageInfo?.stageNumber ?? 0;
         }
 
         /// <summary>
@@ -505,7 +858,7 @@ namespace GravityFlipLab.Stage
             stageLoaded = true;
             OnStageLoaded?.Invoke();
 
-            Debug.Log("StageManager: Stage load completed successfully");
+            Debug.Log($"StageManager: Stage load completed successfully - {currentStageData.stageInfo.stageName}");
         }
 
         // ゴールセットアップメソッド
@@ -1480,6 +1833,9 @@ namespace GravityFlipLab.Stage
                     DestroyImmediate(slope.gameObject);
             }
             activeSlopes.Clear();
+
+            // アセットリリースを追加
+            ReleaseCurrentStageAssets();
 
             stageLoaded = false;
             Debug.Log("StageManager: Stage cleared successfully");

@@ -1457,7 +1457,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 575c95f8ad516a741bd2895e60c1e71e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentStageData: {fileID: 11400000, guid: 8596279e9dba48d49a99a4918c0b15ba, type: 2}
+  currentStageData: {fileID: 0}
   obstacleParent: {fileID: 845526763}
   collectibleParent: {fileID: 411778078}
   environmentalParent: {fileID: 1494709938}

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using AddressableManagementSystem;
 
 namespace GravityFlipLab.Stage
 {
@@ -48,6 +49,9 @@ namespace GravityFlipLab.Stage
             InitializeTerrainSegments();
             ValidateTerrainData();
             ValidateSlopes();
+
+            // StageInfo の検証と自動設定を追加
+            ValidateAndAutoSetStageInfo();
         }
 
         private void InitializeTerrainLayers()
@@ -529,6 +533,368 @@ namespace GravityFlipLab.Stage
                     }
                 }
             }
+        }
+        private void ValidateAndAutoSetStageInfo()
+        {
+            if (stageInfo == null)
+            {
+                stageInfo = new StageInfo();
+            }
+
+            // エディター環境でのみ実行
+#if UNITY_EDITOR
+            // ファイル名から自動設定を試行
+            if (stageInfo.worldNumber <= 0 || stageInfo.stageNumber <= 0)
+            {
+                TryAutoSetStageInfoFromAssetPath();
+            }
+
+            // ステージ名が空の場合は自動設定
+            if (string.IsNullOrEmpty(stageInfo.stageName) && stageInfo.worldNumber > 0 && stageInfo.stageNumber > 0)
+            {
+                stageInfo.stageName = $"World {stageInfo.worldNumber} - Stage {stageInfo.stageNumber}";
+            }
+#endif
+
+            // 基本的な検証
+            if (stageInfo.worldNumber <= 0 || stageInfo.stageNumber <= 0)
+            {
+                Debug.LogWarning($"StageInfo validation warning in {name}: worldNumber({stageInfo.worldNumber}) and stageNumber({stageInfo.stageNumber}) should be greater than 0");
+            }
+        }
+#if UNITY_EDITOR
+        // 3. アセットパスからの自動設定メソッドを追加
+        private void TryAutoSetStageInfoFromAssetPath()
+        {
+            string assetPath = UnityEditor.AssetDatabase.GetAssetPath(this);
+            if (string.IsNullOrEmpty(assetPath)) return;
+
+            // パスの例: "Assets/AddressableAssets/StageData/World1/Stage1-1.asset"
+            // または: "Assets/Data/Stages/World2/Stage2-3.asset"
+
+            string fileName = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+            string directoryName = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(assetPath));
+
+            // ファイル名からの抽出: "Stage1-1" -> World:1, Stage:1
+            if (fileName.StartsWith("Stage") && fileName.Contains("-"))
+            {
+                string numberPart = fileName.Substring(5); // "Stage" を除去
+                string[] parts = numberPart.Split('-');
+
+                if (parts.Length == 2)
+                {
+                    if (int.TryParse(parts[0], out int world) && int.TryParse(parts[1], out int stage))
+                    {
+                        stageInfo.worldNumber = world;
+                        stageInfo.stageNumber = stage;
+                        Debug.Log($"Auto-set StageInfo from filename: World {world}, Stage {stage}");
+
+                        // Addressableキーの設定も確認
+                        string expectedKey = $"Stage{world}-{stage}";
+                        Debug.Log($"Expected Addressable key: {expectedKey}");
+                        return;
+                    }
+                }
+            }
+
+            // ディレクトリ名からの抽出: "World1" -> World:1
+            if (directoryName.StartsWith("World") && int.TryParse(directoryName.Substring(5), out int dirWorld))
+            {
+                stageInfo.worldNumber = dirWorld;
+
+                // ファイル名からステージ番号を抽出
+                if (fileName.Contains(dirWorld.ToString()))
+                {
+                    // "Stage1-2" や "1-2" のようなパターンを探す
+                    var match = System.Text.RegularExpressions.Regex.Match(fileName, dirWorld + @"-(\d+)");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int fileStage))
+                    {
+                        stageInfo.stageNumber = fileStage;
+                        Debug.Log($"Auto-set StageInfo from path: World {dirWorld}, Stage {fileStage}");
+
+                        // Addressableキーの設定も確認
+                        string expectedKey = $"Stage{dirWorld}-{fileStage}";
+                        Debug.Log($"Expected Addressable key: {expectedKey}");
+                    }
+                }
+            }
+        }
+
+        // 4. エディター用のコンテキストメニューを追加
+        [UnityEditor.MenuItem("CONTEXT/StageDataSO/Validate Addressable Key")]
+        private static void ValidateAddressableKeyMenuItem(UnityEditor.MenuCommand command)
+        {
+            StageDataSO stageData = command.context as StageDataSO;
+            if (stageData != null)
+            {
+                stageData.ValidateAddressableKey();
+            }
+        }
+
+        [UnityEditor.MenuItem("CONTEXT/StageDataSO/Auto Set Addressable Key")]
+        private static void AutoSetAddressableKeyMenuItem(UnityEditor.MenuCommand command)
+        {
+            StageDataSO stageData = command.context as StageDataSO;
+            if (stageData != null)
+            {
+                stageData.AutoSetAddressableKey();
+            }
+        }
+
+        [UnityEditor.MenuItem("CONTEXT/StageDataSO/Validate Stage Info")]
+        private static void ValidateStageInfoMenuItem(UnityEditor.MenuCommand command)
+        {
+            StageDataSO stageData = command.context as StageDataSO;
+            if (stageData != null)
+            {
+                stageData.ValidateStageInfoManually();
+            }
+        }
+
+        [UnityEditor.MenuItem("CONTEXT/StageDataSO/Reset Stage Info")]
+        private static void ResetStageInfoMenuItem(UnityEditor.MenuCommand command)
+        {
+            StageDataSO stageData = command.context as StageDataSO;
+            if (stageData != null)
+            {
+                stageData.ResetStageInfo();
+            }
+        }
+#endif
+        // 5. 手動実行可能なメソッドを追加
+        [ContextMenu("Auto Set Stage Info")]
+        public void AutoSetStageInfoFromPath()
+        {
+#if UNITY_EDITOR
+            TryAutoSetStageInfoFromAssetPath();
+            UnityEditor.EditorUtility.SetDirty(this);
+            Debug.Log($"StageInfo auto-set completed for {name}");
+#endif
+        }
+
+        [ContextMenu("Validate Stage Info")]
+        public void ValidateStageInfoManually()
+        {
+            if (stageInfo == null)
+            {
+                Debug.LogError($"StageInfo is null in {name}");
+                return;
+            }
+
+            bool isValid = true;
+            List<string> errors = new List<string>();
+
+            if (stageInfo.worldNumber <= 0)
+            {
+                errors.Add($"worldNumber ({stageInfo.worldNumber}) must be greater than 0");
+                isValid = false;
+            }
+
+            if (stageInfo.stageNumber <= 0)
+            {
+                errors.Add($"stageNumber ({stageInfo.stageNumber}) must be greater than 0");
+                isValid = false;
+            }
+
+            if (stageInfo.worldNumber > 5) // ConfigManager.maxWorlds
+            {
+                errors.Add($"worldNumber ({stageInfo.worldNumber}) exceeds maximum worlds (5)");
+                isValid = false;
+            }
+
+            if (stageInfo.stageNumber > 10) // ConfigManager.stagesPerWorld
+            {
+                errors.Add($"stageNumber ({stageInfo.stageNumber}) exceeds maximum stages per world (10)");
+                isValid = false;
+            }
+
+            if (string.IsNullOrEmpty(stageInfo.stageName))
+            {
+                errors.Add("stageName is empty");
+                // これは警告レベル
+            }
+
+            if (isValid)
+            {
+                Debug.Log($"StageInfo validation passed for {name}: World {stageInfo.worldNumber}, Stage {stageInfo.stageNumber}");
+            }
+            else
+            {
+                Debug.LogError($"StageInfo validation failed for {name}:\n" + string.Join("\n", errors));
+            }
+
+            if (errors.Count == 1 && string.IsNullOrEmpty(stageInfo.stageName))
+            {
+                Debug.LogWarning($"StageInfo warning for {name}: stageName is empty");
+            }
+        }
+        [ContextMenu("Reset Stage Info")]
+        public void ResetStageInfo()
+        {
+            stageInfo = new StageInfo
+            {
+                worldNumber = 1,
+                stageNumber = 1,
+                stageName = "New Stage",
+                timeLimit = 300f,
+                energyChipCount = 3,
+                playerStartPosition = Vector3.zero,
+                goalPosition = new Vector3(50f, 0f, 0f),
+                checkpointPositions = new List<Vector3>(),
+                theme = StageTheme.Tech,
+                stageLength = 4096f,
+                stageHeight = 1024f,
+                segmentCount = 16
+            };
+
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+
+            Debug.Log($"StageInfo reset to default values for {name}");
+        }
+        public bool ValidateResourcePath()
+        {
+            if (stageInfo == null) return false;
+
+            string expectedPath = $"StageData/World{stageInfo.worldNumber}/Stage{stageInfo.worldNumber}-{stageInfo.stageNumber}";
+
+#if UNITY_EDITOR
+            string assetPath = UnityEditor.AssetDatabase.GetAssetPath(this);
+            string resourcePath = assetPath.Replace("Assets/Resources/", "").Replace(".asset", "");
+
+            if (resourcePath != expectedPath)
+            {
+                Debug.LogWarning($"Resource path mismatch in {name}:\n" +
+                                $"Expected: {expectedPath}\n" +
+                                $"Actual: {resourcePath}");
+                return false;
+            }
+#endif
+
+            return true;
+        }
+        public bool ValidateStageCompleteness()
+        {
+            List<string> warnings = new List<string>();
+            bool isComplete = true;
+
+            if (stageInfo == null)
+            {
+                warnings.Add("StageInfo is null");
+                isComplete = false;
+            }
+            else
+            {
+                ValidateStageInfoManually(); // 既存の検証を実行
+
+                if (stageInfo.energyChipCount != collectibles?.Count)
+                {
+                    warnings.Add($"energyChipCount ({stageInfo.energyChipCount}) doesn't match collectibles count ({collectibles?.Count ?? 0})");
+                }
+
+                if (stageInfo.timeLimit <= 0)
+                {
+                    warnings.Add("timeLimit should be greater than 0");
+                }
+
+                if (Vector3.Distance(stageInfo.playerStartPosition, stageInfo.goalPosition) < 10f)
+                {
+                    warnings.Add("Player start and goal positions are too close");
+                }
+            }
+
+            if (!ValidateResourcePath())
+            {
+                isComplete = false;
+            }
+
+            if (warnings.Count > 0)
+            {
+                Debug.LogWarning($"Stage completeness check for {name}:\n" + string.Join("\n", warnings));
+            }
+
+            return isComplete;
+        }
+
+        [ContextMenu("Validate Addressable Key")]
+        public async void ValidateAddressableKey()
+        {
+            if (stageInfo == null)
+            {
+                Debug.LogError($"StageInfo is null in {name}");
+                return;
+            }
+
+            string expectedKey = $"Stage{stageInfo.worldNumber}-{stageInfo.stageNumber}";
+
+            Debug.Log($"Validating Addressable key for {name}: {expectedKey}");
+
+            try
+            {
+                bool keyExists = await AddressableHelper.ValidateKeyExists(expectedKey);
+
+                if (keyExists)
+                {
+                    Debug.Log($"✓ Addressable key validation passed for {name}: {expectedKey}");
+
+                    // アセットタイプも確認
+                    var assetType = await AddressableHelper.GetAssetTypeForKey(expectedKey);
+                    if (assetType == typeof(StageDataSO))
+                    {
+                        Debug.Log($"✓ Asset type is correct: {assetType.Name}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"⚠ Asset type mismatch. Expected: StageDataSO, Got: {assetType?.Name ?? "Unknown"}");
+                    }
+                }
+                else
+                {
+                    Debug.LogError($"✗ Addressable key validation failed for {name}: {expectedKey} does not exist");
+                    Debug.LogError("Make sure the asset is properly configured in Addressable Asset Settings");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"Error validating Addressable key for {name}: {e.Message}");
+            }
+        }
+        [ContextMenu("Auto Set Addressable Key")]
+        public void AutoSetAddressableKey()
+        {
+#if UNITY_EDITOR
+            if (stageInfo == null)
+            {
+                Debug.LogError($"StageInfo is null in {name}");
+                return;
+            }
+
+            string expectedKey = $"Stage{stageInfo.worldNumber}-{stageInfo.stageNumber}";
+
+            // Addressable Asset Settingsでキーを設定
+            var guid = UnityEditor.AssetDatabase.AssetPathToGUID(UnityEditor.AssetDatabase.GetAssetPath(this));
+            var settings = UnityEditor.AddressableAssets.AddressableAssetSettingsDefaultObject.Settings;
+
+            if (settings != null)
+            {
+                var entry = settings.FindAssetEntry(guid);
+                if (entry != null)
+                {
+                    entry.address = expectedKey;
+                    UnityEditor.EditorUtility.SetDirty(settings);
+                    Debug.Log($"Set Addressable key for {name}: {expectedKey}");
+                }
+                else
+                {
+                    Debug.LogWarning($"Asset {name} is not in any Addressable group. Please add it to an Addressable group first.");
+                }
+            }
+            else
+            {
+                Debug.LogError("Addressable Asset Settings not found");
+            }
+#endif
         }
     }
 
