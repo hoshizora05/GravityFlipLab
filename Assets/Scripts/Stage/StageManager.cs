@@ -100,6 +100,9 @@ namespace GravityFlipLab.Stage
         // 現在アクティブな傾斜オブジェクト
         private List<SlopeObject> activeSlopes = new List<SlopeObject>();
 
+        [Header("Ground Level Integration")]
+        private float groundLevelOffset = 0f;
+
 
         private void Awake()
         {
@@ -817,7 +820,38 @@ namespace GravityFlipLab.Stage
             currentStageData = defaultStageData;
             StartCoroutine(LoadStageCoroutine());
         }
+        private void CalculateGroundLevelOffset()
+        {
+            groundLevelOffset = 0f;
 
+            if (useTilemapTerrain && tilemapGroundManager != null)
+            {
+                float groundLevel = tilemapGroundManager.groundLevel;
+                float thickness = tilemapGroundManager.groundThickness;
+
+                // 実測値に基づく計算式
+                // groundLevel=-10, thickness=4 で着地位置=-6.4 の関係から
+                // 着地位置 = groundLevel + thickness + 0.6
+                float estimatedLandingY = groundLevel + thickness - 0.4f;
+
+                // y座標0を地面表面（着地位置）に合わせるためのオフセット
+                groundLevelOffset = estimatedLandingY;
+
+                Debug.Log($"StageManager: Ground level={groundLevel}, thickness={thickness}");
+                Debug.Log($"StageManager: Estimated landing position={estimatedLandingY}, offset={groundLevelOffset}");
+            }
+            else
+            {
+                Debug.Log("StageManager: No tilemap terrain system, using default offset (0)");
+            }
+        }
+        /// <summary>
+        /// 位置にグラウンドレベルオフセットを適用
+        /// </summary>
+        private Vector3 ApplyGroundLevelOffset(Vector3 originalPosition)
+        {
+            return new Vector3(originalPosition.x, originalPosition.y + groundLevelOffset, originalPosition.z);
+        }
         private IEnumerator LoadStageCoroutine()
         {
             Debug.Log("StageManager: Starting stage load coroutine");
@@ -826,6 +860,8 @@ namespace GravityFlipLab.Stage
             ClearStage();
 
             yield return new WaitForEndOfFrame();
+
+            CalculateGroundLevelOffset();
 
             // Setup background layers
             yield return StartCoroutine(SetupBackground());
@@ -870,7 +906,7 @@ namespace GravityFlipLab.Stage
                 return;
             }
 
-            Vector3 goalPosition = currentStageData.stageInfo.goalPosition;
+            Vector3 goalPosition = ApplyGroundLevelOffset(currentStageData.stageInfo.goalPosition);
             Debug.Log($"StageManager: Setting up goal at position: {goalPosition}");
 
             // ゴールプレハブが設定されている場合
@@ -939,7 +975,7 @@ namespace GravityFlipLab.Stage
                 return;
             }
 
-            Vector3 playerStartPosition = currentStageData.stageInfo.playerStartPosition;
+            Vector3 playerStartPosition = ApplyGroundLevelOffset(currentStageData.stageInfo.playerStartPosition);
             Debug.Log($"StageManager: Setting up player at position: {playerStartPosition}");
 
             // 既存のプレイヤーがあれば削除
@@ -1195,7 +1231,7 @@ namespace GravityFlipLab.Stage
                 if (prefab != null)
                 {
                     GameObject instance = Instantiate(prefab, obstacleParent);
-                    instance.transform.position = obstacleData.position;
+                    instance.transform.position = ApplyGroundLevelOffset(obstacleData.position);
                     instance.transform.rotation = Quaternion.Euler(obstacleData.rotation);
                     instance.transform.localScale = obstacleData.scale;
 
@@ -1222,7 +1258,7 @@ namespace GravityFlipLab.Stage
                 if (prefab != null)
                 {
                     GameObject instance = Instantiate(prefab, collectibleParent);
-                    instance.transform.position = collectibleData.position;
+                    instance.transform.position = ApplyGroundLevelOffset(collectibleData.position);
 
                     Collectible collectible = instance.GetComponent<Collectible>();
                     if (collectible != null)
@@ -1246,7 +1282,7 @@ namespace GravityFlipLab.Stage
                 if (prefab != null)
                 {
                     GameObject instance = Instantiate(prefab, environmentalParent);
-                    instance.transform.position = envData.position;
+                    instance.transform.position = ApplyGroundLevelOffset(envData.position);
                     instance.transform.localScale = envData.scale;
 
                     // Apply environmental-specific parameters
@@ -1269,7 +1305,7 @@ namespace GravityFlipLab.Stage
                     if (prefab != null)
                     {
                         GameObject instance = Instantiate(prefab, slopeParent);
-                        instance.transform.position = slopeData.position;
+                        instance.transform.position = ApplyGroundLevelOffset(slopeData.position);
                         instance.transform.rotation = Quaternion.Euler(slopeData.rotation);
                         instance.transform.localScale = slopeData.scale;
 
@@ -1378,7 +1414,7 @@ namespace GravityFlipLab.Stage
         {
             GameObject defaultSlope = new GameObject($"Slope_{slopeData.type}_{slopeData.position.x}_{slopeData.position.y}");
             defaultSlope.transform.SetParent(slopeParent);
-            defaultSlope.transform.position = slopeData.position;
+            defaultSlope.transform.position = ApplyGroundLevelOffset(slopeData.position);
             defaultSlope.transform.rotation = Quaternion.Euler(slopeData.rotation);
             defaultSlope.transform.localScale = slopeData.scale;
 
@@ -1540,7 +1576,7 @@ namespace GravityFlipLab.Stage
             // Initialize player position and setup enhanced checkpoint system
             if (currentPlayer != null)
             {
-                Vector3 playerStartPos = currentStageData.stageInfo.playerStartPosition;
+                Vector3 playerStartPos = ApplyGroundLevelOffset(currentStageData.stageInfo.playerStartPosition);
                 currentPlayer.transform.position = playerStartPos;
 
                 // Set initial checkpoint with enhanced system
@@ -1622,16 +1658,17 @@ namespace GravityFlipLab.Stage
 
         private void CreateEnhancedCheckpoint(Vector3 position)
         {
+            Vector3 adjustedPosition = ApplyGroundLevelOffset(position);
             GameObject checkpoint;
 
             if (checkpointPrefab != null)
             {
-                checkpoint = Instantiate(checkpointPrefab, position, Quaternion.identity);
+                checkpoint = Instantiate(checkpointPrefab, adjustedPosition, Quaternion.identity);
             }
             else
             {
                 checkpoint = new GameObject("Enhanced Checkpoint");
-                checkpoint.transform.position = position;
+                checkpoint.transform.position = adjustedPosition;
 
                 // Add visual components
                 CreateCheckpointVisuals(checkpoint);
@@ -1645,7 +1682,7 @@ namespace GravityFlipLab.Stage
             }
 
             // Configure trigger
-            checkpointTrigger.checkpointPosition = position;
+            checkpointTrigger.checkpointPosition = adjustedPosition;
             checkpointTrigger.useTransformPosition = true;
             checkpointTrigger.saveGravityState = true;
             checkpointTrigger.requireGrounded = false; // Allow air checkpoints
@@ -1671,7 +1708,7 @@ namespace GravityFlipLab.Stage
         private void CreateBasicCheckpoint(Vector3 position)
         {
             GameObject checkpoint = new GameObject("Checkpoint");
-            checkpoint.transform.position = position;
+            checkpoint.transform.position = ApplyGroundLevelOffset(position);
             checkpoint.layer = LayerMask.NameToLayer("Checkpoint");
 
             BoxCollider2D trigger = checkpoint.AddComponent<BoxCollider2D>();
@@ -1744,7 +1781,7 @@ namespace GravityFlipLab.Stage
             if (currentStageData?.stageInfo == null) return;
 
             float stageLength = currentStageData.stageInfo.stageLength;
-            Vector3 startPos = currentStageData.stageInfo.playerStartPosition;
+            Vector3 startPos = ApplyGroundLevelOffset(currentStageData.stageInfo.playerStartPosition);
 
             // Generate checkpoints at regular intervals
             int checkpointCount = Mathf.FloorToInt(stageLength / checkpointSpacing);

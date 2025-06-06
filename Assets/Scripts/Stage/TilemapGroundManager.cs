@@ -157,19 +157,815 @@ namespace GravityFlipLab.Stage
 
         private void GenerateGroundFromData(StageDataSO stageData)
         {
-            // ステージデータから地形情報を読み込んで生成
-            // 今回は基本的な地面を生成し、将来的にはステージデータから詳細な地形を読み込む
-            GenerateBasicGround();
-            GenerateBasicCeiling();
+            Debug.Log($"Generating terrain from stage data: {stageData.stageInfo.stageName}");
 
-            // プラットフォームの生成
-            GeneratePlatforms();
-            GenerateCeilingPlatforms();
+            // ステージサイズの設定
+            stageWidthInTiles = Mathf.RoundToInt(stageData.stageInfo.stageLength / stageData.tileSize);
+
+            // 地形レイヤーの処理
+            if (stageData.terrainLayers != null && stageData.terrainLayers.Length > 0)
+            {
+                // 各地形レイヤーを生成
+                foreach (var terrainLayer in stageData.terrainLayers)
+                {
+                    if (terrainLayer != null && terrainLayer.autoGenerate)
+                    {
+                        GenerateTerrainLayer(terrainLayer, stageData);
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("No terrain layers found, generating basic terrain");
+                GenerateBasicGround();
+                GenerateBasicCeiling();
+            }
+
+            // 地形セグメントの処理
+            if (stageData.terrainSegments != null && stageData.terrainSegments.Length > 0)
+            {
+                GenerateTerrainSegments(stageData.terrainSegments, stageData);
+            }
+
+            // 傾斜の処理
+            if (stageData.HasSlopes())
+            {
+                GenerateSlopeTerrain(stageData.GetSlopes(), stageData);
+            }
 
             // 壁の生成
             GenerateWalls();
 
-            Debug.Log($"Ground and ceiling generated for stage: {stageData.stageInfo.stageName}");
+            // タイルマップの最終処理
+            RefreshTilemap();
+
+            Debug.Log($"Terrain generation completed for stage: {stageData.stageInfo.stageName}");
+        }
+
+        private void GenerateTerrainLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            if (terrainLayer.tileVariants == null || terrainLayer.tileVariants.Length == 0)
+            {
+                Debug.LogWarning($"Terrain layer {terrainLayer.layerName} has no tile variants");
+                return;
+            }
+
+            switch (terrainLayer.layerType)
+            {
+                case TerrainLayerType.Ground:
+                    GenerateGroundLayer(terrainLayer, stageData);
+                    break;
+                case TerrainLayerType.Platform:
+                    GeneratePlatformLayer(terrainLayer, stageData);
+                    break;
+                case TerrainLayerType.Background:
+                case TerrainLayerType.Foreground:
+                    // 背景・前景は現在のシステムでは処理しない
+                    break;
+                case TerrainLayerType.Collision:
+                    GenerateCollisionLayer(terrainLayer, stageData);
+                    break;
+                case TerrainLayerType.OneWayPlatform:
+                    GenerateOneWayPlatformLayer(terrainLayer, stageData);
+                    break;
+                case TerrainLayerType.Breakable:
+                    GenerateBreakableLayer(terrainLayer, stageData);
+                    break;
+                case TerrainLayerType.Hazard:
+                    GenerateHazardLayer(terrainLayer, stageData);
+                    break;
+            }
+        }
+
+        private void GenerateGroundLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            int baseHeight = Mathf.RoundToInt(terrainLayer.baseHeight);
+            int thickness = Mathf.RoundToInt(terrainLayer.thickness);
+
+            switch (terrainLayer.generationMode)
+            {
+                case TerrainGenerationMode.Flat:
+                    GenerateFlatGround(terrainLayer, baseHeight, thickness, stageData);
+                    break;
+                case TerrainGenerationMode.Hilly:
+                    GenerateHillyGround(terrainLayer, baseHeight, thickness, stageData);
+                    break;
+                case TerrainGenerationMode.Mountainous:
+                    GenerateMountainousGround(terrainLayer, baseHeight, thickness, stageData);
+                    break;
+                case TerrainGenerationMode.Custom:
+                    GenerateCustomGround(terrainLayer, baseHeight, thickness, stageData);
+                    break;
+                case TerrainGenerationMode.FromHeightmap:
+                    if (stageData.heightMap != null)
+                    {
+                        GenerateHeightmapGround(terrainLayer, stageData);
+                    }
+                    else
+                    {
+                        GenerateFlatGround(terrainLayer, baseHeight, thickness, stageData);
+                    }
+                    break;
+            }
+        }
+
+        private void GenerateFlatGround(TerrainLayerData terrainLayer, int baseHeight, int thickness, StageDataSO stageData)
+        {
+            for (int x = 0; x < stageWidthInTiles; x++)
+            {
+                for (int y = 0; y < thickness; y++)
+                {
+                    Vector3Int position = new Vector3Int(x, baseHeight - y, 0);
+                    TileBase tile = terrainLayer.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateHillyGround(TerrainLayerData terrainLayer, int baseHeight, int thickness, StageDataSO stageData)
+        {
+            for (int x = 0; x < stageWidthInTiles; x++)
+            {
+                // ノイズを使用して丘陵地形を生成
+                float noiseValue = Mathf.PerlinNoise(x * terrainLayer.noiseScale, terrainLayer.noiseSeed * 0.01f);
+                int heightVariation = Mathf.RoundToInt(noiseValue * terrainLayer.noiseAmplitude);
+                int currentHeight = thickness + heightVariation;
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(x, baseHeight + heightVariation - y, 0);
+                    TileBase tile = terrainLayer.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateMountainousGround(TerrainLayerData terrainLayer, int baseHeight, int thickness, StageDataSO stageData)
+        {
+            for (int x = 0; x < stageWidthInTiles; x++)
+            {
+                // 複数のノイズレイヤーを組み合わせて山岳地形を生成
+                float noise1 = Mathf.PerlinNoise(x * terrainLayer.noiseScale, terrainLayer.noiseSeed * 0.01f);
+                float noise2 = Mathf.PerlinNoise(x * terrainLayer.noiseScale * 2f, terrainLayer.noiseSeed * 0.02f) * 0.5f;
+                float noise3 = Mathf.PerlinNoise(x * terrainLayer.noiseScale * 4f, terrainLayer.noiseSeed * 0.03f) * 0.25f;
+
+                float combinedNoise = noise1 + noise2 + noise3;
+                int heightVariation = Mathf.RoundToInt(combinedNoise * terrainLayer.noiseAmplitude);
+                int currentHeight = thickness + heightVariation;
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(x, baseHeight + heightVariation - y, 0);
+                    TileBase tile = terrainLayer.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateCustomGround(TerrainLayerData terrainLayer, int baseHeight, int thickness, StageDataSO stageData)
+        {
+            if (stageData.enableProceduralGeneration)
+            {
+                // プロシージャル生成
+                System.Random random = new System.Random(stageData.proceduralSeed + terrainLayer.noiseSeed);
+
+                for (int x = 0; x < stageWidthInTiles; x++)
+                {
+                    // カスタム曲線を使用した高度計算
+                    float t = x / (float)stageWidthInTiles;
+                    float curveValue = stageData.terrainCurve.Evaluate(t);
+                    int heightVariation = Mathf.RoundToInt(curveValue * terrainLayer.noiseAmplitude);
+                    int currentHeight = thickness + heightVariation;
+
+                    for (int y = 0; y < currentHeight; y++)
+                    {
+                        Vector3Int position = new Vector3Int(x, baseHeight + heightVariation - y, 0);
+                        TileBase tile = terrainLayer.GetTileForPosition(x, y, y);
+
+                        foregroundTilemap.SetTile(position, tile);
+                        tileTypeMap[position] = TileType.Ground;
+                    }
+                }
+            }
+            else
+            {
+                // 通常のフラット地形
+                GenerateFlatGround(terrainLayer, baseHeight, thickness, stageData);
+            }
+        }
+
+        private void GenerateHeightmapGround(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            int baseHeight = Mathf.RoundToInt(terrainLayer.baseHeight);
+            int thickness = Mathf.RoundToInt(terrainLayer.thickness);
+
+            for (int x = 0; x < stageWidthInTiles; x++)
+            {
+                // ハイトマップから高度を取得
+                float u = x / (float)stageWidthInTiles;
+                Color pixelColor = stageData.heightMap.GetPixelBilinear(u, 0.5f);
+                int heightVariation = Mathf.RoundToInt(pixelColor.r * terrainLayer.noiseAmplitude);
+                int currentHeight = thickness + heightVariation;
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(x, baseHeight + heightVariation - y, 0);
+                    TileBase tile = terrainLayer.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GeneratePlatformLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            // プラットフォームレイヤーは個別のプラットフォーム配置として処理
+            // 現在はplatformPositionsを使用
+            foreach (var platformPos in platformPositions)
+            {
+                Vector2Int size = new Vector2Int(4, 1); // デフォルトサイズ
+
+                for (int x = 0; x < size.x; x++)
+                {
+                    for (int y = 0; y < size.y; y++)
+                    {
+                        Vector3Int position = new Vector3Int(platformPos.x + x, platformPos.y + y, 0);
+                        TileBase tile = terrainLayer.GetTileForPosition(x, y, 0);
+
+                        foregroundTilemap.SetTile(position, tile);
+                        tileTypeMap[position] = TileType.Platform;
+                    }
+                }
+            }
+        }
+
+        private void GenerateCollisionLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            // 衝突判定のみのレイヤー（見た目は透明）
+            int baseHeight = Mathf.RoundToInt(terrainLayer.baseHeight);
+            int thickness = Mathf.RoundToInt(terrainLayer.thickness);
+
+            for (int x = 0; x < stageWidthInTiles; x++)
+            {
+                for (int y = 0; y < thickness; y++)
+                {
+                    Vector3Int position = new Vector3Int(x, baseHeight - y, 0);
+                    TileBase tile = terrainLayer.GetTileForPosition(x, y, y);
+
+                    if (tile != null)
+                    {
+                        foregroundTilemap.SetTile(position, tile);
+                        tileTypeMap[position] = TileType.Ground; // 衝突判定として扱う
+                    }
+                }
+            }
+        }
+
+        private void GenerateOneWayPlatformLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            // ワンウェイプラットフォームレイヤー
+            foreach (var platformPos in platformPositions)
+            {
+                Vector2Int size = new Vector2Int(4, 1);
+
+                for (int x = 0; x < size.x; x++)
+                {
+                    Vector3Int position = new Vector3Int(platformPos.x + x, platformPos.y, 0);
+                    TileBase tile = terrainLayer.GetTileForPosition(x, 0, 0);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.OneWayPlatform;
+                }
+
+                // ワンウェイプラットフォームの特別なコライダー設定
+                SetupOneWayCollider(new Vector3Int(platformPos.x, platformPos.y, 0));
+            }
+        }
+
+        private void GenerateBreakableLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            // 破壊可能なブロック（今回は通常の地形として扱う）
+            GenerateFlatGround(terrainLayer, Mathf.RoundToInt(terrainLayer.baseHeight),
+                              Mathf.RoundToInt(terrainLayer.thickness), stageData);
+        }
+
+        private void GenerateHazardLayer(TerrainLayerData terrainLayer, StageDataSO stageData)
+        {
+            // 危険地帯（今回は通常の地形として扱う）
+            GenerateFlatGround(terrainLayer, Mathf.RoundToInt(terrainLayer.baseHeight),
+                              Mathf.RoundToInt(terrainLayer.thickness), stageData);
+        }
+
+        private void GenerateTerrainSegments(TerrainSegmentData[] segments, StageDataSO stageData)
+        {
+            // プライマリ地形レイヤーを取得
+            TerrainLayerData primaryLayer = GetPrimaryTerrainLayer(stageData);
+            if (primaryLayer == null) return;
+
+            foreach (var segment in segments)
+            {
+                if (segment != null)
+                {
+                    GenerateTerrainSegment(segment, primaryLayer, stageData);
+                }
+            }
+        }
+
+        private void GenerateTerrainSegment(TerrainSegmentData segment, TerrainLayerData layerData, StageDataSO stageData)
+        {
+            Vector2Int start = segment.startPosition;
+            Vector2Int size = segment.size;
+
+            switch (segment.pattern)
+            {
+                case TerrainPattern.Flat:
+                    GenerateSegmentFlat(start, size, layerData);
+                    break;
+                case TerrainPattern.Ascending:
+                    GenerateSegmentAscending(start, size, layerData, segment.heightVariation);
+                    break;
+                case TerrainPattern.Descending:
+                    GenerateSegmentDescending(start, size, layerData, segment.heightVariation);
+                    break;
+                case TerrainPattern.Valley:
+                    GenerateSegmentValley(start, size, layerData, segment.heightVariation);
+                    break;
+                case TerrainPattern.Hill:
+                    GenerateSegmentHill(start, size, layerData, segment.heightVariation);
+                    break;
+                case TerrainPattern.Stairs:
+                    GenerateSegmentStairs(start, size, layerData);
+                    break;
+                case TerrainPattern.Gaps:
+                    GenerateSegmentGaps(start, size, layerData);
+                    break;
+                case TerrainPattern.Platforms:
+                    GenerateSegmentPlatforms(segment, layerData);
+                    break;
+            }
+
+            // セグメント内のプラットフォームを生成
+            foreach (var platform in segment.platforms)
+            {
+                GenerateSegmentPlatform(platform, layerData, start);
+            }
+
+            // セグメント内の地形フィーチャーを生成
+            foreach (var feature in segment.features)
+            {
+                GenerateSegmentFeature(feature, layerData, start);
+            }
+        }
+
+        private void GenerateSegmentFlat(Vector2Int start, Vector2Int size, TerrainLayerData layerData)
+        {
+            for (int x = 0; x < size.x; x++)
+            {
+                for (int y = 0; y < size.y; y++)
+                {
+                    Vector3Int position = new Vector3Int(start.x + x, start.y - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateSegmentAscending(Vector2Int start, Vector2Int size, TerrainLayerData layerData, float heightVariation)
+        {
+            for (int x = 0; x < size.x; x++)
+            {
+                float progress = x / (float)size.x;
+                int heightOffset = Mathf.RoundToInt(progress * heightVariation);
+                int currentHeight = size.y + heightOffset;
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(start.x + x, start.y + heightOffset - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateSegmentDescending(Vector2Int start, Vector2Int size, TerrainLayerData layerData, float heightVariation)
+        {
+            for (int x = 0; x < size.x; x++)
+            {
+                float progress = 1f - (x / (float)size.x);
+                int heightOffset = Mathf.RoundToInt(progress * heightVariation);
+                int currentHeight = size.y + heightOffset;
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(start.x + x, start.y + heightOffset - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateSegmentValley(Vector2Int start, Vector2Int size, TerrainLayerData layerData, float heightVariation)
+        {
+            for (int x = 0; x < size.x; x++)
+            {
+                float normalizedX = (x / (float)size.x) * 2f - 1f; // -1 to 1
+                float valleyDepth = (1f - Mathf.Abs(normalizedX)) * heightVariation;
+                int currentHeight = size.y + Mathf.RoundToInt(valleyDepth);
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(start.x + x, start.y + Mathf.RoundToInt(valleyDepth) - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateSegmentHill(Vector2Int start, Vector2Int size, TerrainLayerData layerData, float heightVariation)
+        {
+            for (int x = 0; x < size.x; x++)
+            {
+                float normalizedX = (x / (float)size.x) * 2f - 1f; // -1 to 1
+                float hillHeight = (1f - normalizedX * normalizedX) * heightVariation; // 放物線
+                int currentHeight = size.y + Mathf.RoundToInt(hillHeight);
+
+                for (int y = 0; y < currentHeight; y++)
+                {
+                    Vector3Int position = new Vector3Int(start.x + x, start.y + Mathf.RoundToInt(hillHeight) - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(position, tile);
+                    tileTypeMap[position] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateSegmentStairs(Vector2Int start, Vector2Int size, TerrainLayerData layerData)
+        {
+            int stepCount = Mathf.Min(8, size.x / 2);
+            int stepWidth = Mathf.Max(1, size.x / stepCount);
+            int stepHeight = 1;
+
+            for (int step = 0; step < stepCount; step++)
+            {
+                int stepStartX = step * stepWidth;
+                int stepEndX = Mathf.Min((step + 1) * stepWidth, size.x);
+                int stepY = step * stepHeight;
+
+                for (int x = stepStartX; x < stepEndX; x++)
+                {
+                    for (int y = 0; y <= stepY + size.y; y++)
+                    {
+                        Vector3Int position = new Vector3Int(start.x + x, start.y + stepY - y, 0);
+                        TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                        foregroundTilemap.SetTile(position, tile);
+                        tileTypeMap[position] = TileType.Ground;
+                    }
+                }
+            }
+        }
+
+        private void GenerateSegmentGaps(Vector2Int start, Vector2Int size, TerrainLayerData layerData)
+        {
+            int gapWidth = 4;
+            int platformWidth = 8;
+
+            for (int x = 0; x < size.x; x++)
+            {
+                if (x % (gapWidth + platformWidth) < platformWidth)
+                {
+                    // プラットフォーム部分
+                    for (int y = 0; y < size.y; y++)
+                    {
+                        Vector3Int position = new Vector3Int(start.x + x, start.y - y, 0);
+                        TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                        foregroundTilemap.SetTile(position, tile);
+                        tileTypeMap[position] = TileType.Ground;
+                    }
+                }
+                // ギャップ部分は何も生成しない
+            }
+        }
+
+        private void GenerateSegmentPlatforms(TerrainSegmentData segment, TerrainLayerData layerData)
+        {
+            // プラットフォームのみのセグメント（基本地形なし）
+            foreach (var platform in segment.platforms)
+            {
+                GenerateSegmentPlatform(platform, layerData, segment.startPosition);
+            }
+        }
+
+        private void GenerateSegmentPlatform(PlatformData platform, TerrainLayerData layerData, Vector2Int segmentStart)
+        {
+            Vector2Int absolutePos = segmentStart + platform.position;
+
+            for (int x = 0; x < platform.size.x; x++)
+            {
+                for (int y = 0; y < platform.size.y; y++)
+                {
+                    Vector3Int position = new Vector3Int(absolutePos.x + x, absolutePos.y + y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                    foregroundTilemap.SetTile(position, tile);
+
+                    // プラットフォームタイプに応じたtileType設定
+                    TileType tileType = platform.isOneWay ? TileType.OneWayPlatform : TileType.Platform;
+                    tileTypeMap[position] = tileType;
+                }
+            }
+        }
+
+        private void GenerateSegmentFeature(TerrainFeatureData feature, TerrainLayerData layerData, Vector2Int segmentStart)
+        {
+            Vector2Int absolutePos = segmentStart + feature.position;
+
+            switch (feature.featureType)
+            {
+                case TerrainFeatureType.Spikes:
+                    GenerateFeatureSpikes(absolutePos, feature, layerData);
+                    break;
+                case TerrainFeatureType.Pit:
+                    GenerateFeaturePit(absolutePos, feature);
+                    break;
+                case TerrainFeatureType.Ramp:
+                    GenerateFeatureRamp(absolutePos, feature, layerData);
+                    break;
+                case TerrainFeatureType.Wall:
+                    GenerateFeatureWall(absolutePos, feature, layerData);
+                    break;
+                case TerrainFeatureType.Ceiling:
+                    GenerateFeatureCeiling(absolutePos, feature, layerData);
+                    break;
+                case TerrainFeatureType.Bridge:
+                    GenerateFeatureBridge(absolutePos, feature, layerData);
+                    break;
+                case TerrainFeatureType.Tunnel:
+                    GenerateFeatureTunnel(absolutePos, feature, layerData);
+                    break;
+                case TerrainFeatureType.Decoration:
+                    GenerateFeatureDecoration(absolutePos, feature, layerData);
+                    break;
+            }
+        }
+
+        private void GenerateFeatureSpikes(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            Vector3Int tilePos = new Vector3Int(position.x, position.y, 0);
+            TileBase tile = layerData.tileVariants[0];
+
+            foregroundTilemap.SetTile(tilePos, tile);
+            tileTypeMap[tilePos] = TileType.Ground;
+        }
+
+        private void GenerateFeaturePit(Vector2Int position, TerrainFeatureData feature)
+        {
+            // 穴の生成（タイルを削除）
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                for (int y = 0; y < feature.size.y; y++)
+                {
+                    Vector3Int tilePos = new Vector3Int(position.x + x, position.y - y, 0);
+                    foregroundTilemap.SetTile(tilePos, null);
+                    tileTypeMap.Remove(tilePos);
+                }
+            }
+        }
+
+        private void GenerateFeatureRamp(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                int height = Mathf.RoundToInt((x / (float)feature.size.x) * feature.size.y);
+                for (int y = 0; y <= height; y++)
+                {
+                    Vector3Int tilePos = new Vector3Int(position.x + x, position.y + y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateFeatureWall(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                for (int y = 0; y < feature.size.y; y++)
+                {
+                    Vector3Int tilePos = new Vector3Int(position.x + x, position.y + y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Wall;
+                }
+            }
+        }
+
+        private void GenerateFeatureCeiling(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                for (int y = 0; y < feature.size.y; y++)
+                {
+                    Vector3Int tilePos = new Vector3Int(position.x + x, position.y - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Ceiling;
+                }
+            }
+        }
+
+        private void GenerateFeatureBridge(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            // 橋の生成（横一列のプラットフォーム）
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                Vector3Int tilePos = new Vector3Int(position.x + x, position.y, 0);
+                TileBase tile = layerData.GetTileForPosition(x, 0, 0);
+
+                foregroundTilemap.SetTile(tilePos, tile);
+                tileTypeMap[tilePos] = TileType.Platform;
+            }
+        }
+
+        private void GenerateFeatureTunnel(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            // トンネルの生成（上下に壁、中央は空洞）
+            int tunnelHeight = feature.size.y;
+            int wallThickness = 1;
+
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                // 上の壁
+                for (int y = 0; y < wallThickness; y++)
+                {
+                    Vector3Int tilePos = new Vector3Int(
+                        position.x + x,
+                        position.y + tunnelHeight / 2 + y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Ceiling;
+                }
+
+                // 下の壁
+                for (int y = 0; y < wallThickness; y++)
+                {
+                    Vector3Int tilePos = new Vector3Int(
+                        position.x + x,
+                        position.y - tunnelHeight / 2 - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateFeatureDecoration(Vector2Int position, TerrainFeatureData feature, TerrainLayerData layerData)
+        {
+            // 装飾用のタイル配置（50%の確率で配置）
+            for (int x = 0; x < feature.size.x; x++)
+            {
+                for (int y = 0; y < feature.size.y; y++)
+                {
+                    int seed = (position.x + x) * 1000 + (position.y + y);
+                    System.Random random = new System.Random(seed);
+
+                    if (random.NextDouble() > 0.5)
+                    {
+                        Vector3Int tilePos = new Vector3Int(position.x + x, position.y + y, 0);
+                        TileBase tile = layerData.GetTileForPosition(x, y, 0);
+
+                        foregroundTilemap.SetTile(tilePos, tile);
+                        tileTypeMap[tilePos] = TileType.Ground;
+                    }
+                }
+            }
+        }
+
+        private void GenerateSlopeTerrain(List<SlopeData> slopes, StageDataSO stageData)
+        {
+            // 傾斜データからタイルマップに傾斜地形を生成
+            TerrainLayerData primaryLayer = GetPrimaryTerrainLayer(stageData);
+            if (primaryLayer == null) return;
+
+            foreach (var slope in slopes)
+            {
+                if (slope != null && slope.IsValid())
+                {
+                    GenerateSlopeTiles(slope, primaryLayer);
+                }
+            }
+        }
+
+        private void GenerateSlopeTiles(SlopeData slope, TerrainLayerData layerData)
+        {
+            Vector2Int startPos = new Vector2Int(
+                Mathf.RoundToInt(slope.position.x / 16f), // ワールド座標をタイル座標に変換
+                Mathf.RoundToInt(slope.position.y / 16f)
+            );
+
+            int slopeWidthInTiles = Mathf.RoundToInt(slope.slopeLength / 16f);
+            int maxHeightInTiles = Mathf.RoundToInt(Mathf.Tan(slope.slopeAngle * Mathf.Deg2Rad) * slope.slopeLength / 16f);
+
+            switch (slope.slopeDirection)
+            {
+                case SlopeDirection.Ascending:
+                    GenerateAscendingSlopeTiles(startPos, slopeWidthInTiles, maxHeightInTiles, layerData);
+                    break;
+                case SlopeDirection.Descending:
+                    GenerateDescendingSlopeTiles(startPos, slopeWidthInTiles, maxHeightInTiles, layerData);
+                    break;
+                //case SlopeDirection.Both:
+                //    // 山型傾斜
+                //    int halfWidth = slopeWidthInTiles / 2;
+                //    GenerateAscendingSlopeTiles(startPos, halfWidth, maxHeightInTiles, layerData);
+                //    GenerateDescendingSlopeTiles(new Vector2Int(startPos.x + halfWidth, startPos.y + maxHeightInTiles),
+                //                               halfWidth, maxHeightInTiles, layerData);
+                //    break;
+            }
+        }
+
+        private void GenerateAscendingSlopeTiles(Vector2Int start, int width, int maxHeight, TerrainLayerData layerData)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int currentHeight = Mathf.RoundToInt((x / (float)width) * maxHeight);
+
+                for (int y = 0; y <= currentHeight + 2; y++) // +2 for thickness
+                {
+                    Vector3Int tilePos = new Vector3Int(start.x + x, start.y + currentHeight - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Ground;
+                }
+            }
+        }
+
+        private void GenerateDescendingSlopeTiles(Vector2Int start, int width, int maxHeight, TerrainLayerData layerData)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int currentHeight = Mathf.RoundToInt(((width - x) / (float)width) * maxHeight);
+
+                for (int y = 0; y <= currentHeight + 2; y++) // +2 for thickness
+                {
+                    Vector3Int tilePos = new Vector3Int(start.x + x, start.y + currentHeight - y, 0);
+                    TileBase tile = layerData.GetTileForPosition(x, y, y);
+
+                    foregroundTilemap.SetTile(tilePos, tile);
+                    tileTypeMap[tilePos] = TileType.Ground;
+                }
+            }
+        }
+
+        private TerrainLayerData GetPrimaryTerrainLayer(StageDataSO stageData)
+        {
+            if (stageData.terrainLayers == null || stageData.terrainLayers.Length == 0)
+                return null;
+
+            // 最初のGroundタイプレイヤーを探す
+            foreach (var layer in stageData.terrainLayers)
+            {
+                if (layer != null && layer.layerType == TerrainLayerType.Ground &&
+                    layer.tileVariants != null && layer.tileVariants.Length > 0)
+                {
+                    return layer;
+                }
+            }
+
+            // なければ最初の有効なレイヤーを返す
+            foreach (var layer in stageData.terrainLayers)
+            {
+                if (layer != null && layer.tileVariants != null && layer.tileVariants.Length > 0)
+                {
+                    return layer;
+                }
+            }
+
+            return null;
         }
 
         public void GenerateBasicGround()

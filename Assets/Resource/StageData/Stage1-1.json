@@ -1,0 +1,132 @@
+{
+  "stageInfo": {
+    "worldNumber": 1,
+    "stageNumber": 1,
+    "stageName": "First Steps",
+    "timeLimit": 180.0,
+    "energyChipCount": 3,
+    "playerStartPosition": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "goalPosition": {
+      "x": 45.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "checkpointPositions": [
+      {
+        "x": 20.0,
+        "y": 0.0,
+        "z": 0.0
+      }
+    ],
+    "theme": 0,
+    "stageLength": 3072.0,
+    "stageHeight": 1024.0,
+    "segmentCount": 12
+  },
+  "obstacles": [
+    {
+      "type": 0,
+      "position": {
+        "x": 35.0,
+        "y": -2.0,
+        "z": 0.0
+      },
+      "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "parameters": {}
+    }
+  ],
+  "collectibles": [
+    {
+      "type": 0,
+      "position": {
+        "x": 8.0,
+        "y": 2.0,
+        "z": 0.0
+      },
+      "value": 1
+    },
+    {
+      "type": 0,
+      "position": {
+        "x": 22.0,
+        "y": 1.5,
+        "z": 0.0
+      },
+      "value": 1
+    },
+    {
+      "type": 0,
+      "position": {
+        "x": 40.0,
+        "y": 2.5,
+        "z": 0.0
+      },
+      "value": 1
+    }
+  ],
+  "environmental": [
+    {
+      "type": 2,
+      "position": {
+        "x": 30.0,
+        "y": -1.0,
+        "z": 0.0
+      },
+      "scale": {
+        "x": 2.0,
+        "y": 2.0,
+        "z": 1.0
+      },
+      "parameters": {
+        "bounceForce": 8.0,
+        "bounceDirection": "up"
+      }
+    }
+  ],
+  "tileMapSize": {
+    "x": 192,
+    "y": 64
+  },
+  "tileSize": 16.0,
+  "useCompositeCollider": true,
+  "slopes": [
+    {
+      "type": 2,
+      "position": {
+        "x": 12.0,
+        "y": -2.0,
+        "z": 0.0
+      },
+      "rotation": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "scale": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0
+      },
+      "slopeAngle": 15.0,
+      "slopeDirection": 0,
+      "slopeLength": 4.0,
+      "speedMultiplier": 1.1,
+      "affectGravity": true,
+      "gravityRedirection": 0.3,
+      "parameters": {}
+    }
+  ]
+}
